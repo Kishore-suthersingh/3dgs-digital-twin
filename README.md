@@ -347,6 +347,8 @@ The pipeline works end to end on fisheye, multi-camera, masked data: poses and u
 
 **Second scene:** [`notebooks/02b_quality_table.ipynb`](notebooks/02b_quality_table.ipynb) applies the garden winner (MCMC 1M, 30k) to our own wicker-table video. It uses the same frames, poses and test split as Phase 1b, so the two runs compare fairly. It also saves the training-ready scene to Drive (`datasets/scene1_ready.zip`) so Phase 3 can skip COLMAP.
 
+**Gap-filling runs (Kaggle):** [`notebooks/02c_kaggle_fill_gaps.ipynb`](notebooks/02c_kaggle_fill_gaps.ipynb) trains bicycle (mcmc 1M, 30k) and retries garden default at 30k with `expandable_segments` and `--packed` (F2.1). It runs as a committed Kaggle notebook, so it keeps going with the browser closed.
+
 | Table scene (834×468, every 8th frame held out) | Gaussians | PSNR / SSIM / LPIPS | Train | VRAM | Size |
 |---|---|---|---|---|---|
 | Phase 1b: default, 7k | 541,980 | 29.76 / 0.951 / 0.166 | — | — | — |
@@ -481,18 +483,21 @@ Additions beyond the original plan:
 
 **Results** (`results/metrics.csv` → rendered here). ⚠️ Only compare rows scored against the same images: original-JPG and undistorted rows aren't comparable (`docs/failures.md` F1.3). For comparison with published results, use the provided `images_4` with the official poses and `--data_factor 1`, as the published 3DGS results do (`02` notebook). Published 3DGS garden at 30k: PSNR 27.41, SSIM 0.868, LPIPS 0.103 (Kerbl et al. 2023, per-scene table; check before quoting).
 
-| Scene | Res | Strategy | #Gaussians | Steps | PSNR | SSIM | LPIPS | Train time | Peak VRAM | Size (raw / comp.) |
+| Scene | Res | Strategy | #Gaussians | Steps | PSNR | SSIM | LPIPS | Train time | Peak VRAM | Size (.ply / web .splat) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| garden *(Phase 0, invalid: bug F1.2)* | ~1/64 | default | 483,133 | 7k | 30.51 | 0.948 | 0.019 (alex) | – | – | 120 MB / – |
-| garden, official poses, original JPGs | 1/4 | default | 3,624,313 | 7k | 25.98 | 0.809 | 0.203 | – | – | – |
-| garden, official poses, undistorted images | 1/4 | default | 2,421,936 | 7k | 27.73 | 0.854 | 0.175 | – | – | – |
-| garden, **our COLMAP poses**, undistorted images | 1/4 | default | 2,424,820 | 7k | **27.75** | 0.855 | 0.176 | 12 min | – | – |
-| garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 1M | 1,000,000 | 7k | 25.93 | 0.812 | 0.189 | 6.4 min | 1.3 GB | 248 MB / – |
-| garden *(Phase 2)* | 1/4 | mcmc 1M | 1,000,000 | 30k | **26.99** | 0.849 | 0.139 | 35.1 min (T4) | 3.4 GB | 248 MB / – |
-| garden *(Phase 2, 7k checkpoint)* | 1/4 | default | 5,377,074 | 7k | 26.34 | 0.833 | 0.154 | ~16 min | – | ~1.3 GB / – |
+| garden *(Phase 0, invalid: bug F1.2)* | ~1/64 | default | 483,133 | 7k | 30.51 | 0.948 | 0.019 (alex) | – | – | 120 MB / 15 MB |
+| garden, official poses, original JPGs | 1/4 | default | 3,624,313 | 7k | 25.98 | 0.809 | 0.203 | – | – | 899 MB / 116 MB |
+| garden, official poses, undistorted images | 1/4 | default | 2,421,936 | 7k | 27.73 | 0.854 | 0.175 | – | – | 601 MB / 78 MB |
+| garden, **our COLMAP poses**, undistorted images | 1/4 | default | 2,424,820 | 7k | **27.75** | 0.855 | 0.176 | 12 min | – | 601 MB / 78 MB |
+| garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 1M | 1,000,000 | 7k | 25.93 | 0.812 | 0.189 | 6.4 min | 1.3 GB | 248 MB / 32 MB |
+| garden *(Phase 2)* | 1/4 | mcmc 1M | 1,000,000 | 30k | **26.99** | 0.849 | 0.139 | 35.1 min (T4) | 3.4 GB | 248 MB / 32 MB |
+| garden *(Phase 2, 7k checkpoint)* | 1/4 | default | 5,377,074 | 7k | 26.34 | 0.833 | 0.154 | ~16 min | – | 1,334 MB / 172 MB |
 | garden *(Phase 2)* | 1/4 | default | – | 30k | *out of memory on T4 at ~11.8k steps (F2.1)* | – | – | – | 14.6 GB T4 full | – |
-| garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 500k | 500,000 | 7k | 25.55 | 0.791 | 0.223 | 5.2 min | 0.8 GB | 124 MB / – |
-| garden *(Phase 2)* | 1/4 | mcmc 500k | 500,000 | 30k | 26.43 | 0.825 | 0.180 | 25.7 min (T4) | 3.0 GB | 124 MB / – |
+| garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 500k | 500,000 | 7k | 25.55 | 0.791 | 0.223 | 5.2 min | 0.8 GB | 124 MB / 16 MB |
+| garden *(Phase 2)* | 1/4 | mcmc 500k | 500,000 | 30k | 26.43 | 0.825 | 0.180 | 25.7 min (T4) | 3.0 GB | 124 MB / 16 MB |
+| garden *(retry, Kaggle `02c`)* | 1/4 | default `--packed` | | 30k | *pending* | | | | | |
+| bicycle *(Kaggle `02c`)* | 1/4 | mcmc 1M | | 30k | *pending* (paper 25.25 / 0.771 / 0.205) | | | | | |
+| table (phone video, own split) | 834×468 | mcmc 1M | 1,000,000 | 30k | 32.15 | 0.965 | 0.106 | 45.1 min (T4) | 1.8 GB | 248 MB / 23 MB (cleaned, 722k) |
 
 **Phase 2 garden summary (T4, 30k steps, published 3DGS: 27.41 / 0.868 / 0.103):**
 
@@ -503,7 +508,8 @@ Additions beyond the original plan:
 | default (ADC) | 5.4M at 7k | – | out of memory at ~11.8k steps (F2.1) | – | – | > 14.5 GB | – | ~1.3 GB |
 
 Halving the Gaussians (1M → 500k) costs 0.56 dB PSNR and a clearly worse LPIPS (0.139 → 0.180), but makes the file half the size and renders ~60% faster. **mcmc 1M is our default recipe**; 500k is the option for the web viewer if file size matters.
-| bicycle | 1/4 | mcmc 1M | – | 30k | – | – | – | – | – | – |
+
+Sizes: `.ply` = 62 floats (248 bytes) per Gaussian; web `.splat` = 32 bytes per Gaussian (position, scale, colour, rotation; no view-dependent colour). Train time and VRAM gaps in older rows: [`notebooks/99_collect_metrics.ipynb`](notebooks/99_collect_metrics.ipynb) reads them from the run folders on Drive (CPU only).
 
 ---
 
