@@ -1,0 +1,36 @@
+# Data & large outputs (live on Colab / Google Drive, not in git)
+data/
+results/**/ckpts/
+*.ply
+*.splat
+*.sog
+*.spz
+*.pt
+*.pth
+*.zip
+*.mp4
+*.mov
+*.MP4
+*.MOV
+
+# Python / notebooks
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# web viewer data (small, levelled .splat) is committed for GitHub Pages
+!viewer/*.splat
+
+# local scratch: raw screenshots (curated copies live in docs/images) and cleanup outputs
+/Screenshot*.png
+exports/
+
+# Wayve renders: dataset licence is non-commercial, keep screenshots local
+docs/images/phase1c_*.png

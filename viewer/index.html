@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wicker Table Twin</title>
+<style>
+  :root { --bg: #0d0f12; --panel: rgba(18, 21, 26, 0.82); --text: #e8eaed; --muted: #9aa0a6; --accent: #f29d38;
+          --line: rgba(255, 255, 255, 0.08); }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+               font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  #scene { position: fixed; inset: 0; }
+  .panel { position: fixed; left: 16px; top: 16px; max-width: min(340px, calc(100vw - 32px)); padding: 14px 16px;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+           backdrop-filter: blur(6px); z-index: 10; }
+  h1 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+  p { margin: 0 0 10px; color: var(--muted); }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0 0 10px; }
+  dt { color: var(--muted); } dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; flex-wrap: wrap; }
+  .row span { color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .seg button { background: none; border: 0; color: var(--muted); padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: rgba(242, 157, 56, 0.16); color: var(--accent); }
+  .note { font-size: 12px; color: var(--muted); margin: -4px 0 10px; min-height: 1.45em; }
+  .keys { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
+  .keys b { color: var(--text); font-weight: 500; }
+  #toggle { margin-top: 8px; background: none; border: 1px solid var(--accent); color: var(--accent);
+            border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  #err { display: none; position: fixed; inset: auto 16px 16px 16px; padding: 12px 14px; background: #3a1414;
+         border: 1px solid #a33; border-radius: 8px; z-index: 20; }
+  .collapsed dl, .collapsed .keys, .collapsed p, .collapsed .row, .collapsed .note { display: none; }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+
+<div class="panel" id="panel">
+  <h1>Wicker table: 3D Gaussian Splatting twin</h1>
+  <p>Reconstructed from a ~1 min phone video. COLMAP poses → gsplat (MCMC, 1M cap, 30k steps) → cropped and cleaned.</p>
+  <dl>
+    <dt>Test PSNR</dt><dd>32.15 dB (SSIM 0.965, LPIPS 0.106)</dd>
+    <dt>Gaussians</dt><dd>664,570 table + 57,514 floor</dd>
+    <dt>Training</dt><dd>45 min on a free Colab T4</dd>
+  </dl>
+  <div class="row">
+    <span>Floor</span>
+    <div class="seg" role="group" aria-label="Floor">
+      <button type="button" data-floor="clean" aria-pressed="true">Clean</button>
+      <button type="button" data-floor="scanned" aria-pressed="false">Scanned</button>
+      <button type="button" data-floor="none" aria-pressed="false">None</button>
+    </div>
+  </div>
+  <div class="note" id="floorNote"></div>
+  <div class="keys">
+    <b>Drag</b> orbit · <b>Right-drag</b> pan · <b>Scroll</b> zoom<br>
+    Touch: <b>1 finger</b> orbit · <b>2 fingers</b> zoom / pan
+  </div>
+  <button id="toggle" type="button">Hide info</button>
+</div>
+<div id="err"></div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"
+} }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+
+  // Written by scripts/clean_splat.py (exports/table_clean.json). The scene is levelled:
+  // y is up, floor at y = 0, tabletop at y ≈ 0.45. Footprint is in (x, z).
+  const FLOOR_RGB = [0.577, 0.565, 0.556];
+  const FOOTPRINT = { center: [-0.0099, 0.028], axisLong: [-0.3103, -0.9506], halfLong: 0.3821, halfShort: 0.2756 };
+  const NOTES = {
+    clean: 'Plain floor in the scanned tile colour, with a soft shadow. Not part of the scan.',
+    scanned: 'The floor as reconstructed. The video was aimed at the table, so it saw the floor only at grazing angles.',
+    none: 'The table alone.',
+  };
+
+  // ---- plain floor: a disc fading into the background, plus a soft contact shadow ----
+  function radialTexture(stops) {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d'), grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+    for (const [at, color] of stops) grad.addColorStop(at, color);
+    g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  }
+  const rgb = FLOOR_RGB.map((v) => Math.round(v * 255)).join(',');
+  const flat = (texture, renderOrder) => {
+    const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);   // lies in x-z, facing up
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false }));
+    m.renderOrder = renderOrder; return m;
+  };
+  const floorDisc = flat(radialTexture([[0, `rgba(${rgb},1)`], [0.55, `rgba(${rgb},0.95)`], [1, `rgba(${rgb},0)`]]), 0);
+  floorDisc.scale.set(2.4, 1, 2.4);
+  floorDisc.position.set(FOOTPRINT.center[0], -0.002, FOOTPRINT.center[1]);
+  const shadow = flat(radialTexture([[0, 'rgba(0,0,0,0.55)'], [0.6, 'rgba(0,0,0,0.3)'], [1, 'rgba(0,0,0,0)']]), 1);
+  shadow.scale.set(FOOTPRINT.halfLong * 2.6, 1, FOOTPRINT.halfShort * 2.6);
+  shadow.rotation.y = Math.atan2(-FOOTPRINT.axisLong[1], FOOTPRINT.axisLong[0]);   // local x -> long axis
+  shadow.position.set(FOOTPRINT.center[0], -0.001, FOOTPRINT.center[1]);
+  const threeScene = new THREE.Scene();
+  threeScene.add(floorDisc, shadow);
+
+  const params = new URLSearchParams(location.search);
+  const viewer = new GaussianSplats3D.Viewer({
+    rootElement: document.getElementById('scene'),
+    threeScene,
+    cameraUp: [0, 1, 0],
+    initialCameraPosition: [1.1, 0.95, 1.1],
+    initialCameraLookAt: [0, 0.25, 0],
+    sharedMemoryForWorkers: false,   // GitHub Pages can't send the COOP/COEP headers SharedArrayBuffer needs
+    gpuAcceleratedSort: false,
+    enableOptionalEffects: true,     // needed to show / hide one splat scene at runtime
+  });
+
+  // keep faint Gaussians (alpha threshold 1/255): MCMC builds the wicker and floor from many of them
+  const scenes = [
+    { path: params.get('scene') || 'table.splat', splatAlphaRemovalThreshold: 1 },
+    { path: params.get('floor') || 'floor.splat', splatAlphaRemovalThreshold: 1 },
+  ];
+
+  const buttons = [...document.querySelectorAll('[data-floor]')];
+  function setFloor(mode) {
+    floorDisc.visible = shadow.visible = mode === 'clean';
+    if (viewer.getSceneCount && viewer.getSceneCount() > 1) viewer.getSplatScene(1).visible = mode === 'scanned';
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.floor === mode)));
+    document.getElementById('floorNote').textContent = NOTES[mode];
+    try { localStorage.setItem('floorMode', mode); } catch (e) { /* storage blocked: fine */ }
+  }
+  let mode = 'clean';
+  try { mode = localStorage.getItem('floorMode') || mode; } catch (e) { /* fine */ }
+  if (!(mode in NOTES)) mode = 'clean';
+  buttons.forEach((b) => b.addEventListener('click', () => { mode = b.dataset.floor; setFloor(mode); }));
+
+  viewer.addSplatScenes(scenes, true)
+    .then(() => { setFloor(mode); viewer.start(); })
+    .catch((e) => {
+      const el = document.getElementById('err');
+      el.style.display = 'block';
+      el.textContent = `Couldn't load the scene: ${e?.message || e}. Open this page through a web server (not file://).`;
+    });
+  document.getElementById('floorNote').textContent = NOTES[mode];
+
+  const panel = document.getElementById('panel'), btn = document.getElementById('toggle');
+  btn.addEventListener('click', () => {
+    btn.textContent = panel.classList.toggle('collapsed') ? 'Show info' : 'Hide info';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+date: 2026-11-03
+python: 3.13.16
+gpu/driver: Tesla T4, 580.82.07
+torch: 2.11.0+cu130 (CUDA 13.0)
+gsplat: 1.5.3
+
+defusedxml==0.7.1
+fused_bilagrid @ git+https://github.com/harry7557558/fused-bilagrid@90f9788e57d3545e3a033c1038bb9986549632fe
+fused_ssim @ git+https://github.com/rahul-goel/fused-ssim@328dc9836f513d00c4b5bc38fe30478b4435cbb5
+gsplat==1.5.3
+ImageIO==2.38.1
+imageio-ffmpeg==0.7.0
+nerfview @ git+https://github.com/nerfstudio-project/nerfview@4538024fe0d15fd1a0e4d760f3695fc44ca72787
+numpy==2.4.6
+opencv-contrib-python==4.14.0.94
+opencv-python==4.11.0.86
+opencv-python-headless==5.0.0.93
+pycolmap @ git+https://github.com/rmbrualla/pycolmap@cc7ea4b7301720ac29287dbe450952511b32125e
+torch==2.11.0+cu130
+torch_fidelity==0.4.0
+torchao==0.10.0
+torchaudio==2.11.0+cu130
+torchcodec==0.11.0+cu130
+torchdata==0.11.0
+torchmetrics==1.9.0
+torchsummary==1.5.1
+torchtune==0.6.1
+torchvision==0.26.0+cu130
+tyro==1.0.16
+viser==1.1.1
