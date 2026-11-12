@@ -2,10 +2,11 @@
 
 > Multi-view video → camera poses → photoreal 3D Gaussian Splatting model → an interactive, editable digital twin you can explore in the browser (and, as a stretch goal, navigate with an AI agent).
 
-<!-- TODO: hero GIF of the final twin goes here -->
-<!-- TODO: badges (Python, PyTorch, gsplat, license) -->
+### ▶ [Open the live 3D viewer](https://kishore-suthersingh.github.io/3dgs-digital-twin/viewer/): a wicker table reconstructed from a phone video. Drag to orbit, scroll to zoom.
 
-**Status:** ✅ Phase 0 complete · 🟡 Phase 1: garden poses validated, phone video working, Wayve stress test run (PSNR 15.2 on held-out front camera) · 🟡 Phase 2: garden done (mcmc 1M PSNR 26.99 vs paper 27.41; 500k 26.43; default OOM on T4), table scene mcmc 1M 30k PSNR 32.15 (+2.39 dB over Phase 1b) · **Started:** Nov 2026 · **Target MVP:** end of Phase 3 (~Week 11)
+<!-- TODO: hero GIF (docs/images/orbit.gif from notebook 03) goes here -->
+
+**Status:** ✅ Phase 0 complete · 🟡 Phase 1: garden poses validated, phone video working, Wayve stress test run (PSNR 15.2 on held-out front camera) · 🟡 Phase 2: garden done (mcmc 1M PSNR 26.99 vs paper 27.41; 500k 26.43; default OOM on T4), table scene mcmc 1M 30k PSNR 32.15 (+2.39 dB over Phase 1b) · 🟡 Phase 3: cleanup script + web viewer live; demo video notebook ready · **Started:** Nov 2026 · **Target MVP:** end of Phase 3 (~Week 11)
 
 ---
 
@@ -636,7 +637,7 @@ The project counts as complete when:
 - [ ] SuperSplat cleanup + edits
 - [x] Code-based cleanup script (`scripts/clean_splat.py`: floor fit, crop, opacity / size / needle filters)
 - [ ] Camera path videos (`03` notebook ready, not yet run)
-- [ ] Web viewer built (`viewer/`, 23 MB of `.splat`), not yet on GitHub Pages
+- [x] Web viewer live on GitHub Pages (`viewer/`, 23 MB of `.splat`)
 - [ ] Demo video
 - [ ] **MVP**
 
