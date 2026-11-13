@@ -34,3 +34,4 @@ exports/
 
 # Wayve renders: dataset licence is non-commercial, keep screenshots local
 docs/images/phase1c_*.png
+!docs/media/demo.mp4

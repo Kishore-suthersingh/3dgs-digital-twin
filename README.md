@@ -4,9 +4,11 @@
 
 ### ▶ [Open the live 3D viewer](https://kishore-suthersingh.github.io/3dgs-digital-twin/viewer/): a wicker table reconstructed from a phone video. Drag to orbit, scroll to zoom.
 
-<!-- TODO: hero GIF (docs/images/orbit.gif from notebook 03) goes here -->
+![Orbit around the cleaned 3DGS model of the wicker table, rendered with gsplat](docs/images/orbit.gif)
 
-**Status:** ✅ Phase 0 complete · 🟡 Phase 1: garden poses validated, phone video working, Wayve stress test run (PSNR 15.2 on held-out front camera) · 🟡 Phase 2: garden done (mcmc 1M PSNR 26.99 vs paper 27.41; 500k 26.43; default OOM on T4), table scene mcmc 1M 30k PSNR 32.15 (+2.39 dB over Phase 1b) · 🟡 Phase 3: cleanup script + web viewer live; demo video notebook ready · **Started:** Nov 2026 · **Target MVP:** end of Phase 3 (~Week 11)
+*653,520 Gaussians, rendered with gsplat from the cleaned model · test PSNR 32.15 dB · [28 s demo video](docs/media/demo.mp4) (input video → raw vs cleaned → orbit)*
+
+**Status:** ✅ Phase 0 complete · 🟡 Phase 1: garden poses validated, phone video working, Wayve stress test run (PSNR 15.2 on held-out front camera) · 🟡 Phase 2: garden done (mcmc 1M PSNR 26.99 vs paper 27.41; default `--packed` 27.22), bicycle mcmc 1M 25.22 (paper 25.25), table scene mcmc 1M 30k PSNR 32.15 (+2.39 dB over Phase 1b) · 🟡 Phase 3: cleanup script, web viewer and demo video done · **Started:** Nov 2026 · **Target MVP:** end of Phase 3 (~Week 11)
 
 ---
 
@@ -431,13 +433,13 @@ Exit criteria:
   python scripts/clean_splat.py "phase2_scene1_mcmc_1M_30k (1).ply" --out exports/table_clean
   ```
 - **`viewer/index.html`:** a three.js page using `@mkkellogg/gaussian-splats-3d` 0.4.7. It loads `table.splat` and `floor.splat` and has a floor switch: **Clean** (a plain disc in the scanned tile colour with a soft shadow, labelled as not scanned), **Scanned** and **None**. It needs no special server headers, so it works on GitHub Pages. Local test: `cd viewer && python -m http.server 8000`.
-- **[`notebooks/03_demo_video.ipynb`](notebooks/03_demo_video.ipynb)** (Colab, T4): runs the same cleanup on the Drive copy of the model, then renders with gsplat at full SH: the input video, raw vs cleaned side by side, and a 12 s orbit. It joins them into `demo.mp4` and makes `orbit.gif` for this README. The camera orbits the table centre with "up" set to the fitted floor normal, so the table stays level. Tested locally with a stub renderer (framing, orientation, captions); not yet run on Colab.
+- **[`notebooks/03_demo_video.ipynb`](notebooks/03_demo_video.ipynb)** (Colab, T4): runs the same cleanup on the Drive copy of the model, then renders with gsplat at full SH: the input video, raw vs cleaned side by side, and a 12 s orbit. It joins them into `demo.mp4` and makes `orbit.gif` for this README. The camera orbits the table centre with "up" set to the fitted floor normal, so the table stays level. **Done:** [`docs/media/demo.mp4`](docs/media/demo.mp4) (28 s, 1280×720) and the GIF at the top. The first run showed a grey smear under the table, which led to the under-object floor rule above. Small white tufts at the feet remain (floor Gaussians in the same grid cells as the legs).
 
 Exit criteria (**MVP**):
 - [ ] A stranger can open the link and fly around smoothly
-- [ ] Obvious artifacts are cleaned
-- [ ] Demo video published
-- [ ] README updated with GIFs, metrics and the link
+- [x] Obvious artifacts are cleaned (small tufts at the feet remain)
+- [x] Demo video published (28 s cut; the narrated 2-3 min version is still open)
+- [x] README updated with GIFs, metrics and the link
 
 ---
 
@@ -570,7 +572,7 @@ gantt
 - [ ] **Demo video** (2–3 min)
 - [ ] Public web viewer link
 - [ ] Tech report / blog post
-- [ ] A clean README hero section (GIF + one-line pitch + link)
+- [x] A clean README hero section (GIF + one-line pitch + link)
 
 ---
 
@@ -649,10 +651,10 @@ The project counts as complete when:
 **Phase 3: Interactive Twin**
 - [ ] SuperSplat cleanup + edits
 - [x] Code-based cleanup script (`scripts/clean_splat.py`: floor fit, crop, opacity / size / needle filters)
-- [ ] Camera path videos (`03` notebook ready, not yet run)
+- [x] Camera path videos (`03` notebook: orbit, raw vs cleaned)
 - [x] Web viewer live on GitHub Pages (`viewer/`, 23 MB of `.splat`)
-- [ ] Demo video
-- [ ] **MVP**
+- [x] Demo video (28 s cut, `docs/media/demo.mp4`)
+- [ ] **MVP** (left: check the viewer on a phone / a stranger's machine)
 
 **Phase 4: Stretch**
 - [ ] VGGT vs COLMAP
