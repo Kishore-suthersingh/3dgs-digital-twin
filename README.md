@@ -347,7 +347,7 @@ The pipeline works end to end on fisheye, multi-camera, masked data: poses and u
 
 **Second scene:** [`notebooks/02b_quality_table.ipynb`](notebooks/02b_quality_table.ipynb) applies the garden winner (MCMC 1M, 30k) to our own wicker-table video. It uses the same frames, poses and test split as Phase 1b, so the two runs compare fairly. It also saves the training-ready scene to Drive (`datasets/scene1_ready.zip`) so Phase 3 can skip COLMAP.
 
-**Gap-filling runs (Kaggle):** [`notebooks/02c_kaggle_fill_gaps.ipynb`](notebooks/02c_kaggle_fill_gaps.ipynb) trains bicycle (mcmc 1M, 30k) and retries garden default at 30k with `expandable_segments` and `--packed` (F2.1). It runs as a committed Kaggle notebook, so it keeps going with the browser closed. **Result:** bicycle mcmc 1M reached **PSNR 25.63 / SSIM 0.788 / LPIPS 0.181** at 30k, **above the published 3DGS numbers** (25.25 / 0.771 / 0.205) with 1M Gaussians, 2.0 GB peak VRAM and 57.5 min on a T4. The garden default retry failed again (see F2.1).
+**Gap-filling runs (Kaggle):** [`notebooks/02c_kaggle_fill_gaps.ipynb`](notebooks/02c_kaggle_fill_gaps.ipynb) trains bicycle (mcmc 1M, 30k) and retries garden default at 30k with `expandable_segments` and `--packed` (F2.1). It runs as a committed Kaggle notebook, so it keeps going with the browser closed. **First attempt (F2.2):** Kaggle's *T4 x2* made gsplat train on both GPUs, which splits the Gaussians and doubles the batch, so the bicycle numbers weren't comparable and garden crashed. The notebook now pins one GPU; rerun pending.
 
 | Table scene (834×468, every 8th frame held out) | Gaussians | PSNR / SSIM / LPIPS | Train | VRAM | Size |
 |---|---|---|---|---|---|
@@ -495,9 +495,8 @@ Additions beyond the original plan:
 | garden *(Phase 2)* | 1/4 | default | – | 30k | *out of memory on T4 at ~11.8k steps (F2.1)* | – | – | – | 14.6 GB T4 full | – |
 | garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 500k | 500,000 | 7k | 25.55 | 0.791 | 0.223 | 5.2 min | 0.8 GB | 124 MB / 16 MB |
 | garden *(Phase 2)* | 1/4 | mcmc 500k | 500,000 | 30k | 26.43 | 0.825 | 0.180 | 25.7 min (T4) | 3.0 GB | 124 MB / 16 MB |
-| garden *(retry, Kaggle `02c`)* | 1/4 | default `--packed` | – | 30k | *failed on Kaggle T4 (cause being checked, F2.1)* | – | – | – | – | – |
-| bicycle *(Kaggle `02c`, 7k checkpoint)* | 1/4 | mcmc 1M | 615,938 | 7k | 23.35 | 0.657 | 0.329 | 5.8 min (T4) | 1.3 GB | 153 MB / 20 MB |
-| bicycle *(Kaggle `02c`)* | 1/4 | mcmc 1M | 1,000,000 | 30k | **25.63** | 0.788 | 0.181 | 57.5 min (T4) | 2.0 GB | 248 MB / 32 MB |
+| garden *(retry, Kaggle `02c`)* | 1/4 | default `--packed` | – | 30k | *pending rerun on one GPU (F2.2)* | – | – | – | – | – |
+| bicycle *(Kaggle `02c`)* | 1/4 | mcmc 1M | | 30k | *pending rerun on one GPU (F2.2)* (paper 25.25 / 0.771 / 0.205) | | | | | |
 | table (phone video, own split) | 834×468 | mcmc 1M | 1,000,000 | 30k | 32.15 | 0.965 | 0.106 | 45.1 min (T4) | 1.8 GB | 248 MB / 23 MB (cleaned, 722k) |
 
 **Phase 2 garden summary (T4, 30k steps, published 3DGS: 27.41 / 0.868 / 0.103):**

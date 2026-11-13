@@ -6,6 +6,12 @@ What broke, why, and how it was fixed. Newest first within each phase.
 
 ## Phase 1: COLMAP poses (Colab, Nov 2026)
 
+### F2.2: On Kaggle "T4 x2", gsplat silently trained on both GPUs
+- **Symptom:** bicycle finished (PSNR 25.63, above the paper), then garden `default --packed` died with `CUDA error: an illegal memory access` from the NCCL process-group watchdog (`ProcessGroupNCCL`, `ProcessExitedException ... SIGABRT`). The log shows two worker process IDs.
+- **Cause:** `simple_trainer.py` starts one process per visible GPU. In multi-GPU mode it splits the initial points between GPUs (`points[world_rank::world_size]`), gives each GPU its own strategy (so `cap-max 1M` means up to 2M in total), uses one image per GPU per step (batch 2), and reports `num_GS` and writes the `.ply` per GPU. The bicycle score came from a different, bigger setup than every other row, and the exported model was half of it. The garden crash is in the multi-GPU path, not out of memory, so it says nothing about F2.1.
+- **Fix:** the Kaggle notebook sets `CUDA_VISIBLE_DEVICES=0` before anything touches the GPU. Both runs are rerun on one T4. The bicycle 25.63 is discarded.
+- **Lesson:** "more GPUs" isn't free speed: check how many processes the trainer starts, and whether the metrics and the exported file cover the whole model. A result that beats the paper on the first try is a reason to check the setup, not to celebrate.
+
 ### F2.1: The `default` strategy runs out of GPU memory on a T4 (garden, 1/4 res, 30k steps)
 - **Symptom:** `torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.23 GiB` at step ~11,825, inside `DefaultStrategy._grow_gs` → `split`. The T4 has 14.56 GiB; 9.58 GiB was allocated by PyTorch and **4.19 GiB reserved but unused** (fragmentation).
 - **Cause:** the default (ADC) strategy keeps splitting Gaussians until step 15k. It had 5.38M at 7k and kept growing, and each split briefly needs a full copy of the optimizer state. It also slowed down: 14.8 → 3.0 steps/s, so the full 30k run would have taken ~2.5 h even with enough memory.
