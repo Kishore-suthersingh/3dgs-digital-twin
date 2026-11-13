@@ -106,11 +106,13 @@
   threeScene.add(floorDisc, shadow);
 
   const params = new URLSearchParams(location.search);
+  // Tall (phone) screens: the field of view is set vertically, so move the camera back until the table fits the width.
+  const aspect = innerWidth / innerHeight, back = aspect < 1 ? Math.min(1 / aspect, 2.2) : 1;
   const viewer = new GaussianSplats3D.Viewer({
     rootElement: document.getElementById('scene'),
     threeScene,
     cameraUp: [0, 1, 0],
-    initialCameraPosition: [1.1, 0.95, 1.1],
+    initialCameraPosition: [1.1 * back, 0.95 * back, 1.1 * back],
     initialCameraLookAt: [0, 0.25, 0],
     sharedMemoryForWorkers: false,   // GitHub Pages can't send the COOP/COEP headers SharedArrayBuffer needs
     gpuAcceleratedSort: false,
@@ -136,16 +138,43 @@
   if (!(mode in NOTES)) mode = 'clean';
   buttons.forEach((b) => b.addEventListener('click', () => { mode = b.dataset.floor; setFloor(mode); }));
 
-  viewer.addSplatScenes(scenes, true)
-    .then(() => { setFloor(mode); viewer.start(); })
+  // The library replaces load errors with a generic message, so keep the real ones to show if loading fails.
+  const seen = [];
+  const remember = (x) => { const s = String(x?.stack || x?.message || x); if (s && seen.length < 20) seen.push(s.slice(0, 300)); };
+  const origError = console.error.bind(console);
+  console.error = (...a) => { a.forEach(remember); origError(...a); };
+  addEventListener('error', (ev) => remember(ev.error || ev.message));
+  addEventListener('unhandledrejection', (ev) => { remember(ev.reason); fail(ev.reason); });
+  let failed = false;
+  function fail(e) {
+    if (failed) return; failed = true;
+    const el = document.getElementById('err');
+    el.style.display = 'block';
+    const hint = location.protocol === 'file:' ? ' Open this page through a web server (not file://).' : ' Reload to try again.';
+    const detail = [...new Set(seen)].filter((s) => s !== String(e?.message)).slice(-3).join(' | ');
+    const mem = navigator.deviceMemory ? `, device memory ${navigator.deviceMemory} GB` : '';
+    el.textContent = `Couldn't load the scene: ${e?.message || e}.${hint}` + (detail ? ` Details: ${detail}` : '') +
+                     ` (${navigator.userAgent.match(/\(([^)]*)\)/)?.[1] || 'unknown device'}${mem})`;
+  }
+
+  // Table: progressive load. It streams straight into the GPU buffer (no per-Gaussian JS objects, which can
+  // exhaust a phone's memory) and shows the table while it downloads. The promise resolves on the first chunk,
+  // so wait until the library is idle before adding the (small) floor scene.
+  const idle = () => new Promise((res) => { const t = setInterval(() => { if (!viewer.isLoadingOrUnloading()) { clearInterval(t); res(); } }, 200); });
+  viewer.start();
+  viewer.addSplatScene(scenes[0].path, { ...scenes[0], progressiveLoad: true, showLoadingUI: true })
+    .then(idle)
+    .then(() => viewer.addSplatScene(scenes[1].path, { ...scenes[1], showLoadingUI: false }))
+    .then(() => setFloor(mode))
     .catch((e) => {
-      const el = document.getElementById('err');
-      el.style.display = 'block';
-      el.textContent = `Couldn't load the scene: ${e?.message || e}. Open this page through a web server (not file://).`;
+      // a floor failure still leaves a usable table
+      if (viewer.getSceneCount && viewer.getSceneCount() === 1) { remember(e); setFloor(mode === 'scanned' ? 'clean' : mode); return; }
+      fail(e);
     });
   document.getElementById('floorNote').textContent = NOTES[mode];
 
   const panel = document.getElementById('panel'), btn = document.getElementById('toggle');
+  if (innerWidth < 600) { panel.classList.add('collapsed'); btn.textContent = 'Show info'; }   // phones: start with the scene in view
   btn.addEventListener('click', () => {
     btn.textContent = panel.classList.toggle('collapsed') ? 'Show info' : 'Hide info';
   });
