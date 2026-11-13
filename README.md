@@ -424,8 +424,8 @@ Exit criteria:
   - keeps a cylinder around the table: radius 0.75, up to 0.75 above the floor;
   - drops Gaussians with opacity below 0.002, longest axis above 0.08, and large needles above the floor (longest axis over 0.04 and more than 8× the second-longest).
   - **1,000,000 → 722,084 Gaussians.** It writes a cleaned `.ply` (original coordinates, full SH, for SuperSplat) and levelled, y-up `.splat` files (base colour only) for the web, split into:
-    - **object** (664,570 Gaussians, 21.3 MB): everything inside the table's footprint ellipse;
-    - **scanned floor** (57,514, 1.8 MB): everything outside the footprint, plus flat, horizontal Gaussians on the ground under the table. Legs are vertical, so they stay with the table. Dropping the higher SH costs little here: the tabletop's brightness is the same with or without them.
+    - **object** (653,520 Gaussians, 20.9 MB): everything inside the table's footprint ellipse, except the floor under it;
+    - **scanned floor** (68,564, 2.2 MB): everything outside the footprint, plus the ground under the table: flat, horizontal Gaussians, and below 9 cm everything that isn't on a leg (legs = grid cells near the footprint rim holding solid Gaussians just above the floor). The second rule came from the demo video: ~11,000 faint, streaky floor Gaussians under the shelf rendered as a grey smear between the legs. Dropping the higher SH costs little here: the tabletop's brightness is the same with or without them.
   - **Lesson from the first try:** filters at opacity 0.005 and needles over 0.01, plus the viewer hiding everything below 2% opacity, made the tabletop look patchy white and removed the floor. MCMC builds the wicker and the floor from many faint, thin Gaussians: 47% of the tabletop's Gaussians are below 2% opacity, and the "needles" removed were 99% wicker strands. Measure what a filter removes, and where, before trusting it.
   ```bash
   python scripts/clean_splat.py "phase2_scene1_mcmc_1M_30k (1).ply" --out exports/table_clean

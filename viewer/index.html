@@ -41,7 +41,7 @@
   <p>Reconstructed from a ~1 min phone video. COLMAP poses → gsplat (MCMC, 1M cap, 30k steps) → cropped and cleaned.</p>
   <dl>
     <dt>Test PSNR</dt><dd>32.15 dB (SSIM 0.965, LPIPS 0.106)</dd>
-    <dt>Gaussians</dt><dd>664,570 table + 57,514 floor</dd>
+    <dt>Gaussians</dt><dd>653,520 table + 68,564 floor</dd>
     <dt>Training</dt><dd>45 min on a free Colab T4</dd>
   </dl>
   <div class="row">
@@ -73,7 +73,7 @@
 
   // Written by scripts/clean_splat.py (exports/table_clean.json). The scene is levelled:
   // y is up, floor at y = 0, tabletop at y ≈ 0.45. Footprint is in (x, z).
-  const FLOOR_RGB = [0.577, 0.565, 0.556];
+  const FLOOR_RGB = [0.593, 0.577, 0.565];
   const FOOTPRINT = { center: [-0.0099, 0.028], axisLong: [-0.3103, -0.9506], halfLong: 0.3821, halfShort: 0.2756 };
   const NOTES = {
     clean: 'Plain floor in the scanned tile colour, with a soft shadow. Not part of the scan.',

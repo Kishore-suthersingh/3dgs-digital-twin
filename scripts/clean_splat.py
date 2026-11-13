@@ -8,7 +8,9 @@ What it does, in order:
 2. Keeps Gaussians inside a cylinder around the object (radius, height above floor).
 3. Drops near-invisible Gaussians (low opacity), huge ones, and needles
    (longest axis much longer than the second longest: the streaks seen in SuperSplat).
-4. Writes the cleaned .ply (original coordinates, all SH kept, opens in SuperSplat)
+4. Splits off the floor: everything outside the object's footprint, flat ground Gaussians under it,
+   and below --foot-height everything that isn't on a leg (the floor seen under the object).
+5. Writes the cleaned .ply (original coordinates, all SH kept, opens in SuperSplat)
    and a levelled, y-up .splat (32 bytes per Gaussian, base colour only) for the web viewer.
 
 Example:
@@ -164,6 +166,9 @@ def main():
     ap.add_argument("--object-ply", action="store_true", help="also write <out>_object.ply (object only, full SH)")
     ap.add_argument("--footprint-margin", type=float, default=0.03,
                     help="everything outside the object's footprint ellipse (+ this margin) goes to _floor.splat")
+    ap.add_argument("--foot-height", type=float, default=0.09,
+                    help="below this height, only Gaussians on the legs stay in the object (0 = off)")
+    ap.add_argument("--leg-cell", type=float, default=0.02, help="grid cell size used to find the legs")
     ap.add_argument("--center-radius", type=float, default=0.3, help="radius used to find the object centre")
     ap.add_argument("--floor-ring", type=float, nargs=2, default=[0.45, 0.9], help="ring used to fit the floor")
     a = ap.parse_args()
@@ -221,6 +226,25 @@ def main():
     thin_axis = mats[np.arange(len(data)), :, np.argmin(scales, 1)]          # direction of the smallest scale
     flat = (s_sorted[:, 0] < 0.3 * s_sorted[:, 1]) & (np.abs(thin_axis @ R[2]) > 0.8)
     floor = keep & (~inside | ((height < a.floor_height) & flat))
+    # Under the object, the floor seen through gaps (and its reflections) is kept as streaky, non-flat
+    # Gaussians that render as a grey smear. Below --foot-height, keep only the feet: grid cells near the
+    # footprint rim that hold solid Gaussians a little above the floor. Everything else low goes to the floor.
+    if a.foot_height > 0:
+        rim = np.hypot(uv[:, 0] / half[0], uv[:, 1] / half[1]) > 0.6
+        legs = keep & inside & rim & (opacity > 0.15) & (height > 0.03) & (height < a.foot_height)
+        lo_xy = local[keep, :2].min(0) - a.leg_cell
+        ij = np.floor((local[:, :2] - lo_xy) / a.leg_cell).astype(int)
+        ij = np.clip(ij, 0, None)
+        grid = np.zeros(ij[keep].max(0) + 1, int)
+        np.add.at(grid, tuple(ij[legs].T), 1)
+        occ = grid >= 2
+        occ[1:] |= occ[:-1].copy(); occ[:-1] |= occ[1:].copy()           # dilate by one cell
+        occ[:, 1:] |= occ[:, :-1].copy(); occ[:, :-1] |= occ[:, 1:].copy()
+        ij = np.minimum(ij, np.array(occ.shape) - 1)
+        on_leg = occ[ij[:, 0], ij[:, 1]] & rim
+        under = keep & inside & ~floor & (height < a.foot_height) & ~on_leg
+        print(f"under the object: {under.sum():,} low Gaussians off the legs -> floor ({occ.sum()} leg cells)")
+        floor |= under
     obj = keep & ~floor
     write_splat(a.out + "_object.splat", pos_web[obj], scales[obj], rgb[obj], opacity[obj], quat_web[obj])
     write_splat(a.out + "_floor.splat", pos_web[floor], scales[floor], rgb[floor], opacity[floor], quat_web[floor])
