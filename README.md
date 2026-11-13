@@ -347,7 +347,7 @@ The pipeline works end to end on fisheye, multi-camera, masked data: poses and u
 
 **Second scene:** [`notebooks/02b_quality_table.ipynb`](notebooks/02b_quality_table.ipynb) applies the garden winner (MCMC 1M, 30k) to our own wicker-table video. It uses the same frames, poses and test split as Phase 1b, so the two runs compare fairly. It also saves the training-ready scene to Drive (`datasets/scene1_ready.zip`) so Phase 3 can skip COLMAP.
 
-**Gap-filling runs (Kaggle):** [`notebooks/02c_kaggle_fill_gaps.ipynb`](notebooks/02c_kaggle_fill_gaps.ipynb) trains bicycle (mcmc 1M, 30k) and retries garden default at 30k with `expandable_segments` and `--packed` (F2.1). It runs as a committed Kaggle notebook, so it keeps going with the browser closed. **First attempt (F2.2):** Kaggle's *T4 x2* made gsplat train on both GPUs, which splits the Gaussians and doubles the batch, so the bicycle numbers weren't comparable and garden crashed. The notebook now pins one GPU; rerun pending.
+**Gap-filling runs (Kaggle):** [`notebooks/02c_kaggle_fill_gaps.ipynb`](notebooks/02c_kaggle_fill_gaps.ipynb) trains bicycle (mcmc 1M, 30k) and retries garden default at 30k with `expandable_segments` and `--packed` (F2.1). It runs as a committed Kaggle notebook, so it keeps going with the browser closed. The first attempt trained on both Kaggle GPUs by accident and was discarded (F2.2). **On one T4:** bicycle mcmc 1M reached **25.22 dB** (paper 25.25), and garden default `--packed` finished at **27.22 dB** (paper 27.41) with 7.8M Gaussians and 11.3 GB peak, so the Colab out-of-memory crash (F2.1) was fragmentation plus the unpacked mode, not a hard 16 GB limit.
 
 | Table scene (834×468, every 8th frame held out) | Gaussians | PSNR / SSIM / LPIPS | Train | VRAM | Size |
 |---|---|---|---|---|---|
@@ -492,11 +492,13 @@ Additions beyond the original plan:
 | garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 1M | 1,000,000 | 7k | 25.93 | 0.812 | 0.189 | 6.4 min | 1.3 GB | 248 MB / 32 MB |
 | garden *(Phase 2)* | 1/4 | mcmc 1M | 1,000,000 | 30k | **26.99** | 0.849 | 0.139 | 35.1 min (T4) | 3.4 GB | 248 MB / 32 MB |
 | garden *(Phase 2, 7k checkpoint)* | 1/4 | default | 5,377,074 | 7k | 26.34 | 0.833 | 0.154 | ~16 min | – | 1,334 MB / 172 MB |
-| garden *(Phase 2)* | 1/4 | default | – | 30k | *out of memory on T4 at ~11.8k steps (F2.1)* | – | – | – | 14.6 GB T4 full | – |
+| garden *(Phase 2, Colab)* | 1/4 | default | – | 30k | *out of memory on T4 at ~11.8k steps (F2.1, fixed below)* | – | – | – | 14.6 GB T4 full | – |
 | garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 500k | 500,000 | 7k | 25.55 | 0.791 | 0.223 | 5.2 min | 0.8 GB | 124 MB / 16 MB |
 | garden *(Phase 2)* | 1/4 | mcmc 500k | 500,000 | 30k | 26.43 | 0.825 | 0.180 | 25.7 min (T4) | 3.0 GB | 124 MB / 16 MB |
-| garden *(retry, Kaggle `02c`)* | 1/4 | default `--packed` | – | 30k | *pending rerun on one GPU (F2.2)* | – | – | – | – | – |
-| bicycle *(Kaggle `02c`)* | 1/4 | mcmc 1M | | 30k | *pending rerun on one GPU (F2.2)* (paper 25.25 / 0.771 / 0.205) | | | | | |
+| garden *(Kaggle `02c`, 7k checkpoint)* | 1/4 | default `--packed` | 5,359,360 | 7k | 26.32 | 0.833 | 0.154 | 16.8 min (T4) | 7.8 GB | 1,329 MB / 171 MB |
+| garden *(Kaggle `02c`)* | 1/4 | default `--packed` | 7,786,777 | 30k | **27.22** | **0.865** | **0.104** | 157.7 min (T4) | 11.3 GB | 1,931 MB / 249 MB |
+| bicycle *(Kaggle `02c`, 7k checkpoint)* | 1/4 | mcmc 1M | 1,000,000 | 7k | 22.92 | 0.633 | 0.357 | 4.3 min (T4) | 1.3 GB | 248 MB / 32 MB |
+| bicycle *(Kaggle `02c`)* | 1/4 | mcmc 1M | 1,000,000 | 30k | **25.22** | 0.763 | 0.225 | 33.4 min (T4) | 3.2 GB | 248 MB / 32 MB |
 | table (phone video, own split) | 834×468 | mcmc 1M | 1,000,000 | 30k | 32.15 | 0.965 | 0.106 | 45.1 min (T4) | 1.8 GB | 248 MB / 23 MB (cleaned, 722k) |
 
 **Phase 2 garden summary (T4, 30k steps, published 3DGS: 27.41 / 0.868 / 0.103):**
@@ -505,7 +507,11 @@ Additions beyond the original plan:
 |---|---|---|---|---|---|---|---|---|
 | mcmc 1M | 1.0M | **26.99** | −0.42 dB ✅ | 0.139 | 35 min | 3.4 GB | ~67 FPS | 248 MB |
 | mcmc 500k | 0.5M | 26.43 | −0.98 dB ✅ (just) | 0.180 | 26 min | 3.0 GB | ~107 FPS | 124 MB |
-| default (ADC) | 5.4M at 7k | – | out of memory at ~11.8k steps (F2.1) | – | – | > 14.5 GB | – | ~1.3 GB |
+| default (ADC) `--packed` | 7.8M | **27.22** | −0.19 dB ✅ | **0.104** | 158 min | 11.3 GB | ~13 FPS | 1.9 GB |
+
+Default ADC (run on Kaggle once `--packed` + `expandable_segments` made it fit, F2.1) is the closest to the paper: +0.23 dB and much better LPIPS (0.104 vs 0.139) than mcmc 1M, but with 7.8× the Gaussians, 4.5× the training time, 3.3× the VRAM, ~5× slower rendering and a 1.9 GB file. For a web twin that trade isn't worth it.
+
+**bicycle (Kaggle, mcmc 1M, 30k): 25.22 / 0.763 / 0.225**, −0.03 dB from the paper (25.25) in 33 min and 3.2 GB peak. So the recipe holds on a second scene.
 
 Halving the Gaussians (1M → 500k) costs 0.56 dB PSNR and a clearly worse LPIPS (0.139 → 0.180), but makes the file half the size and renders ~60% faster. **mcmc 1M is our default recipe**; 500k is the option for the web viewer if file size matters.
 
