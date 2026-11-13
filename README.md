@@ -291,6 +291,7 @@ The official poses also come from COLMAP, so this shows close agreement with a t
 | Loader split | train 800 / test 100, front camera never in training, 97.4% of pixels kept by the mask |
 | Training | 36.8 min in total, ~15 min of which was gsplat compiling (F1.5). Speed fell from 21 to 11 steps/s as the Gaussian count grew |
 | Held-out front camera | PSNR 15.21, SSIM 0.547, LPIPS 0.486 (VGG), 1,891,439 Gaussians |
+| Training loop / peak VRAM / render | 33.2 min (gsplat's own timer) / 2.85 GB / ~49 FPS |
 
 The pipeline works end to end on fisheye, multi-camera, masked data: poses and undistortion check out to well under a pixel, and the split is correct. Seen from the road, the street is recognisable (buildings, parked car, signs), but there are needle-shaped floaters, and from outside the driven path the scene breaks into sky splats, as expected for a capture that only drives in a line. The low front-camera score is not yet explained: it could be the off-axis view, colour differences between cameras, or the sky. Not diagnosed yet. Wayve is a stress test for the pipeline only; the portfolio twin uses our own captures (licence: §14).
 
@@ -485,13 +486,13 @@ Additions beyond the original plan:
 
 | Scene | Res | Strategy | #Gaussians | Steps | PSNR | SSIM | LPIPS | Train time | Peak VRAM | Size (.ply / web .splat) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| garden *(Phase 0, invalid: bug F1.2)* | ~1/64 | default | 483,133 | 7k | 30.51 | 0.948 | 0.019 (alex) | – | – | 120 MB / 15 MB |
-| garden, official poses, original JPGs | 1/4 | default | 3,624,313 | 7k | 25.98 | 0.809 | 0.203 | – | – | 899 MB / 116 MB |
-| garden, official poses, undistorted images | 1/4 | default | 2,421,936 | 7k | 27.73 | 0.854 | 0.175 | – | – | 601 MB / 78 MB |
-| garden, **our COLMAP poses**, undistorted images | 1/4 | default | 2,424,820 | 7k | **27.75** | 0.855 | 0.176 | 12 min | – | 601 MB / 78 MB |
+| garden *(Phase 0, invalid: bug F1.2)* | ~1/64 | default | 483,133 | 7k | 30.51 | 0.948 | 0.019 (alex) | 5.0 min | 0.73 GB | 120 MB / 15 MB |
+| garden, official poses, original JPGs | 1/4 | default | 3,624,313 | 7k | 25.98 | 0.809 | 0.203 | 12.4 min | 5.40 GB | 899 MB / 116 MB |
+| garden, official poses, undistorted images | 1/4 | default | 2,421,936 | 7k | 27.73 | 0.854 | 0.175 | 9.8 min | 3.65 GB | 601 MB / 78 MB |
+| garden, **our COLMAP poses**, undistorted images | 1/4 | default | 2,424,820 | 7k | **27.75** | 0.855 | 0.176 | 9.9 min | 3.64 GB | 601 MB / 78 MB |
 | garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 1M | 1,000,000 | 7k | 25.93 | 0.812 | 0.189 | 6.4 min | 1.3 GB | 248 MB / 32 MB |
 | garden *(Phase 2)* | 1/4 | mcmc 1M | 1,000,000 | 30k | **26.99** | 0.849 | 0.139 | 35.1 min (T4) | 3.4 GB | 248 MB / 32 MB |
-| garden *(Phase 2, 7k checkpoint)* | 1/4 | default | 5,377,074 | 7k | 26.34 | 0.833 | 0.154 | ~16 min | – | 1,334 MB / 172 MB |
+| garden *(Phase 2, 7k checkpoint)* | 1/4 | default | 5,377,074 | 7k | 26.34 | 0.833 | 0.154 | 16.4 min | 7.96 GB | 1,334 MB / 172 MB |
 | garden *(Phase 2, Colab)* | 1/4 | default | – | 30k | *out of memory on T4 at ~11.8k steps (F2.1, fixed below)* | – | – | – | 14.6 GB T4 full | – |
 | garden *(Phase 2, 7k checkpoint)* | 1/4 | mcmc 500k | 500,000 | 7k | 25.55 | 0.791 | 0.223 | 5.2 min | 0.8 GB | 124 MB / 16 MB |
 | garden *(Phase 2)* | 1/4 | mcmc 500k | 500,000 | 30k | 26.43 | 0.825 | 0.180 | 25.7 min (T4) | 3.0 GB | 124 MB / 16 MB |
@@ -499,7 +500,7 @@ Additions beyond the original plan:
 | garden *(Kaggle `02c`)* | 1/4 | default `--packed` | 7,786,777 | 30k | **27.22** | **0.865** | **0.104** | 157.7 min (T4) | 11.3 GB | 1,931 MB / 249 MB |
 | bicycle *(Kaggle `02c`, 7k checkpoint)* | 1/4 | mcmc 1M | 1,000,000 | 7k | 22.92 | 0.633 | 0.357 | 4.3 min (T4) | 1.3 GB | 248 MB / 32 MB |
 | bicycle *(Kaggle `02c`)* | 1/4 | mcmc 1M | 1,000,000 | 30k | **25.22** | 0.763 | 0.225 | 33.4 min (T4) | 3.2 GB | 248 MB / 32 MB |
-| table (phone video, own split) | 834×468 | mcmc 1M | 1,000,000 | 30k | 32.15 | 0.965 | 0.106 | 45.1 min (T4) | 1.8 GB | 248 MB / 23 MB (cleaned, 722k) |
+| table (phone video, own split) | 834×468 | mcmc 1M | 1,000,000 | 30k | 32.15 | 0.965 | 0.106 | 45.1 min (T4) | 1.80 GB | 248 MB / 23 MB (cleaned, 722k) |
 
 **Phase 2 garden summary (T4, 30k steps, published 3DGS: 27.41 / 0.868 / 0.103):**
 
@@ -515,7 +516,7 @@ Default ADC (run on Kaggle once `--packed` + `expandable_segments` made it fit, 
 
 Halving the Gaussians (1M → 500k) costs 0.56 dB PSNR and a clearly worse LPIPS (0.139 → 0.180), but makes the file half the size and renders ~60% faster. **mcmc 1M is our default recipe**; 500k is the option for the web viewer if file size matters.
 
-Sizes: `.ply` = 62 floats (248 bytes) per Gaussian; web `.splat` = 32 bytes per Gaussian (position, scale, colour, rotation; no view-dependent colour). Train time and VRAM gaps in older rows: [`notebooks/99_collect_metrics.ipynb`](notebooks/99_collect_metrics.ipynb) reads them from the run folders on Drive (CPU only).
+Sizes: `.ply` = 62 floats (248 bytes) per Gaussian; web `.splat` = 32 bytes per Gaussian (position, scale, colour, rotation; no view-dependent colour). Train time and peak VRAM come from gsplat's own stats files (training loop only, without evaluation or compiling), collected by [`notebooks/99_collect_metrics.ipynb`](notebooks/99_collect_metrics.ipynb) from the run folders on Drive (CPU only). That's why the "our COLMAP poses" row now says 9.9 min instead of the earlier wall-clock 12 min.
 
 ---
 
