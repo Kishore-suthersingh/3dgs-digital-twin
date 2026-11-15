@@ -1,6 +1,8 @@
 # Open-World Digital Twin with 3D Gaussian Splatting
 
-> Multi-view video → camera poses → photoreal 3D Gaussian Splatting model → an interactive, editable digital twin you can explore in the browser (and, as a stretch goal, navigate with an AI agent).
+> Multi-view video → camera poses → photoreal 3D Gaussian Splatting model → an interactive, editable digital twin you can explore in the browser.
+>
+> **Research track:** when should a pipeline trust a feed-forward 3D model (VGGT) and when should it fall back to classical SfM? We route each chunk of a capture between them, judged by the **quality of the resulting Gaussian-Splatting twin**, with a conformal risk guarantee. [Proposal →](docs/research/hybridsfm_proposal.md)
 
 ### ▶ [Open the live 3D viewer](https://kishore-suthersingh.github.io/3dgs-digital-twin/viewer/): a wicker table reconstructed from a phone video. Drag to orbit, scroll to zoom.
 
@@ -8,7 +10,7 @@
 
 *653,520 Gaussians, rendered with gsplat from the cleaned model · test PSNR 32.15 dB · [28 s demo video](docs/media/demo.mp4) (input video → raw vs cleaned → orbit)*
 
-**Status:** ✅ Phase 0 complete · 🟡 Phase 1: garden poses validated, phone video working, Wayve stress test run (PSNR 15.2 on held-out front camera) · 🟡 Phase 2: garden done (mcmc 1M PSNR 26.99 vs paper 27.41; default `--packed` 27.22), bicycle mcmc 1M 25.22 (paper 25.25), table scene mcmc 1M 30k PSNR 32.15 (+2.39 dB over Phase 1b) · 🟡 Phase 3: cleanup script, web viewer and demo video done · **Started:** Nov 2026 · **Target MVP:** end of Phase 3 (~Week 11)
+**Status:** ✅ Phase 0 complete · 🟡 Phase 1: garden poses validated, phone video working, Wayve stress test run (PSNR 15.2 on held-out front camera) · 🟡 Phase 2: garden done (mcmc 1M PSNR 26.99 vs paper 27.41; default `--packed` 27.22), bicycle mcmc 1M 25.22 (paper 25.25), table scene mcmc 1M 30k PSNR 32.15 (+2.39 dB over Phase 1b) · 🟡 Phase 3: cleanup script, web viewer and demo video done · 🔬 Research track: proposal written (R0) · **Started:** Nov 2026 · **Target MVP:** end of Phase 3 (~Week 11)
 
 ---
 
@@ -56,6 +58,7 @@ The repo backs this up with **metrics tables, visual comparisons, a decision log
 | Modern neural rendering | 3D Gaussian Splatting training, densification, SH appearance, evaluation |
 | Systems engineering | Reproducible data pipeline, GPU-constrained training, compression, web delivery |
 | Interactive 3D tools | Real-time viewer, camera paths, scene editing |
+| ML research (Phase 4) | Uncertainty and calibration of a foundation model (VGGT), conformal risk control, learned routing under a compute budget, benchmark and ablation design |
 | (Stretch) Embodied AI | Navigation agent trained inside a reconstructed world |
 
 This project is deliberately different from earlier Stable Diffusion / FastAPI / EEG work. It moves into **3D vision and neural rendering**.
@@ -83,6 +86,23 @@ flowchart LR
     M -.-> N[Navigation agent<br/>Gymnasium env]
 ```
 
+**Research track (Phase 4): HybridSfM with rendering-aware routing.** Stages follow [`HybridSfM_Pipeline.pdf`](docs/research/HybridSfM_Pipeline.pdf). The new part is the router, which replaces the PDF's pass/fail at stage 5 → 6:
+
+```mermaid
+flowchart LR
+    A[1-3 Preprocess,<br/>retrieval, chunking] --> D[4 VGGT / VGGT-Ω<br/>per chunk]
+    D --> S[Signals<br/>confidence, epipolar, reprojection,<br/>cycle, warp-SSIM, 3DGS probe]
+    S --> P[Predictor<br/>pose error + PSNR loss]
+    P --> R{Conformal router<br/>budget, α}
+    R -- trust --> V[VGGT]
+    R -- refine --> B[VGGT + BA]
+    R -- fallback --> C[6 Classical<br/>ALIKED+LightGlue → GLOMAP]
+    V --> AL[7-8 Sim3 alignment,<br/>loop closure, global BA]
+    B --> AL
+    C --> AL
+    AL --> T[10 3DGS twin<br/>Phases 2-3]
+```
+
 **Data flow per stage**
 
 | Stage | Input | Output |
@@ -104,7 +124,7 @@ flowchart LR
 | Primary representation | **3D Gaussian Splatting** | Real-time rendering, easy editing, good for interactive twins |
 | Secondary (optional) | Zip-NeRF / Nerfacto | For comparison only |
 | Data source | **Public outdoor datasets first** | Legal safety and faster learning. Own/game footage only later and kept private |
-| Pose estimation | **COLMAP / GLOMAP** (VGGT as modern alternative) | Reliable, well understood baseline |
+| Pose estimation | **COLMAP / GLOMAP** for the twin · **VGGT / VGGT-Ω + classical fallback with learned, conformal routing** for the research track | COLMAP is the reliable baseline; the research asks when the fast feed-forward model can be trusted |
 | Training library | **gsplat** | Modern, memory-efficient, well maintained, has the MCMC strategy |
 | Editing priority | Basic first (floaters, color, simple inserts) | Text-guided editing is a stretch goal |
 | Dynamics | Mask moving objects early | Full 4D is too hard for the MVP |
@@ -164,6 +184,10 @@ Keep logging training time, GPU type, #Gaussians and file size for every run.
 │   └── export.py             # .ply → .sog / .spz
 ├── notebooks/          # exploration, plots for the write-up
 ├── viewer/             # web viewer (deployed via GitHub Pages)
+├── hybrid_sfm/         # (Phase 4, planned) research code, layout from the HybridSfM PDF §5
+│   ├── preprocess/ retrieval/ vggt_runner/ verify/ classical/
+│   ├── align/ ba/ dense/ eval/ configs/
+│   └── route/          # signals, predictor, conformal router (our contribution)
 ├── agent/              # (stretch) Gymnasium env + policies
 ├── results/
 │   ├── metrics.csv     # one row per run
@@ -173,7 +197,8 @@ Keep logging training time, GPU type, #Gaussians and file size for every run.
 │   ├── architecture.png
 │   ├── decisions.md    # why each choice was made
 │   ├── failures.md     # what broke and how it was fixed
-│   └── report.md       # final tech report / blog draft
+│   ├── report.md       # final tech report / blog draft
+│   └── research/       # HybridSfM design PDF + paper proposal
 ├── data/               # gitignored: local datasets (in Colab: /content/work/data)
 ├── environment.yml
 └── README.md
@@ -443,21 +468,42 @@ Exit criteria (**MVP**):
 
 ---
 
-### Phase 4: Stretch Goals (Week 12+)
+### Phase 4: Research Track: HybridSfM with Rendering-Aware Routing (Week 12+)
 
-Only start after the MVP passes. Ordered by portfolio value relative to effort:
+**Goal:** turn the twin pipeline into a research contribution in AI / 3D vision, aimed at a top venue (NeurIPS / CVPR / ICCV; fallback: workshop, then journal). Full proposal: [`docs/research/hybridsfm_proposal.md`](docs/research/hybridsfm_proposal.md). Original design: [`HybridSfM_Pipeline.pdf`](docs/research/HybridSfM_Pipeline.pdf).
 
-1. **Pose estimation comparison:** VGGT (feed-forward) vs COLMAP/GLOMAP on the same scenes. Compare speed, pose error and final PSNR.
-2. **Geometry for the twin:** extract depth and mesh using **2DGS** (or PGSR). This gives collision geometry for navigation and measurements.
-3. **Semantic twin:** lift SAM/CLIP features into the Gaussians (Feature-3DGS / LangSplat style) so you can click an object, or type "bench", to select it.
-4. **Navigation agent:**
-   - Wrap the gsplat renderer as a **Gymnasium** environment (observation = rendered RGB(-D), action = move/turn).
-   - Use the 2DGS mesh for collisions.
-   - Start with **imitation learning from recorded camera paths**, then try RL (PPO) for goal reaching.
-5. **Better dynamics:** robust masking of moving objects in driving scenes, and comparison with a 4DGS method.
-6. **NeRF comparison:** Zip-NeRF / Nerfacto through nerfstudio. Compare quality, training time, render FPS and size.
-7. **Compression study:** plot file size vs PSNR (quantisation, SH pruning, Gaussian count).
-8. **Scale up:** connect multiple regions, mild lighting or weather variations.
+**Why not build the PDF as it is:** a literature check (Nov 2026) shows most of its stages already exist:
+
+| PDF stage | What it does | Already done by | Here |
+|---|---|---|---|
+| 1-2 Preprocess, image graph | Keyframes, masks, DINOv2 retrieval | Standard (VGGT-Long, hloc) | Reuse (`01b` blur filter, frames) |
+| 3 + 7 Chunking, Sim(3), loop closure | Long sequences within GPU memory | [VGGT-Long](https://arxiv.org/abs/2507.16443), [SwiftVGGT](https://arxiv.org/abs/2511.18290) | Reuse / reimplement |
+| 4 → 8 VGGT, then bundle adjustment | Fast start, precise finish | VGGT repo, [GGPT](https://arxiv.org/abs/2603.11174) | Baseline |
+| 5 Verify and score | When to trust the network | [GeoCond](https://arxiv.org/abs/2609.18465), [ReVar3R](https://arxiv.org/abs/2610.07883), [VGGT probe](https://arxiv.org/abs/2610.35806), [calibration audit](https://arxiv.org/abs/2608.29705): all scored against **pose/depth error only** | **Ours: rendering-aware signals + predictor** |
+| 6 Classical fallback | Recover where the network fails | hloc-style pipelines | **Ours: chosen by a conformal, budget-aware router** |
+| 9 Scale anchoring | Metric units | Standard | Optional |
+| 10 Dense output / 3DGS | The twin | Phases 2-3 of this repo | **Ours: the downstream label** |
+
+**Novelty:** existing work asks "is this VGGT prediction wrong?". We ask "**which reconstructor gives the best Gaussian-Splatting twin per chunk under a compute budget, and can we bound the loss?**":
+- **C1:** routing formulation, with labels from 3DGS rendering quality as well as pose error;
+- **C2:** rendering-aware signals (photometric warp consistency, a short 3DGS probe) and a calibrated predictor;
+- **C3:** conformal risk control: expected added PSNR loss ≤ α;
+- **C4:** chunk-level benchmark and failure set (phone captures: low texture, wide baselines, reflective floors);
+- **C5:** analysis of when feed-forward poses are good enough for 3DGS.
+
+**Milestones** (exit criteria in the proposal §8):
+
+| ID | Weeks | Work |
+|---|---|---|
+| R0 | 0 | Proposal + literature check ✅ |
+| R1 | 1-3 | VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table: pose error **and** 3DGS PSNR; VGGT memory per chunk size on a T4 |
+| R2 | 4-7 | Chunking, Sim(3) alignment, Kaggle label generator (reuses `02c`); ≥ 100 labelled chunks |
+| R3 | 8-12 | Signals + predictor; H1/H2 (vs native confidence) |
+| R4 | 13-16 | Conformal router + own failure set; H3/H4 |
+| R5 | 17-20 | Full benchmark, baselines (VGGT-Long, MASt3R-SfM, confidence threshold, oracle), ablations |
+| R6 | 21-24 | Paper, arXiv, code + label release |
+
+**Compute:** VGGT-1B in fp16 on a free T4; labels ≈ 300 chunks × 3-4 reconstructors × ~3 min gsplat ≈ 60 GPU-hours (Colab + committed Kaggle runs, one GPU pinned: F2.2).
 
 ---
 
@@ -473,6 +519,14 @@ Additions beyond the original plan:
 - **Reproducibility:** configs, fixed seeds, TensorBoard / W&B logging, one command per stage.
 - **Failure-first documentation:** a good `failures.md` impresses more than perfect results.
 - **Write-up:** a blog post or short tech report (`docs/report.md`) at the end roughly doubles the portfolio value.
+- **Former Phase 4 stretch goals** (after the research track, or alongside it if time allows):
+  - **Geometry:** depth and mesh with **2DGS** (or PGSR), for collision geometry and measurements.
+  - **Semantic twin:** lift SAM/CLIP features into the Gaussians (Feature-3DGS / LangSplat style), so you can click an object or type "bench" to select it.
+  - **Navigation agent:** a **Gymnasium** environment around the gsplat renderer, using the 2DGS mesh for collisions. Start with imitation learning from recorded camera paths, then try RL (PPO).
+  - **Dynamics:** robust masking in driving scenes, and comparison with a 4DGS method.
+  - **NeRF comparison:** Zip-NeRF / Nerfacto through nerfstudio.
+  - **Compression study:** file size vs PSNR.
+  - **Scale-up:** multiple connected regions.
 - **Your own capture (later, private):** walk around a campus spot with a phone (slow, steady, overlapping) and reconstruct it. This shows you can handle real capture, not just curated datasets.
 
 ---
@@ -483,6 +537,12 @@ Additions beyond the original plan:
 - **Metrics:** PSNR ↑, SSIM ↑, LPIPS ↓ on held-out views. ⚠️ gsplat's trainer defaults to **AlexNet** LPIPS, which gives lower numbers. Use `--lpips_net vgg` for runs compared against published 3DGS results.
 - **System metrics:** #Gaussians, training time, peak VRAM, render FPS, file size (raw `.ply` and compressed).
 - **Qualitative:** fixed set of render grids (GT | render | error) for every final model.
+- **Research metrics (Phase 4):**
+  - pose: AUC@30, RRA/RTA, ATE against ground truth;
+  - downstream: PSNR/SSIM/LPIPS of a fixed short gsplat recipe on each reconstructor's poses;
+  - reliability: risk–coverage curves, AURC, failure-detection AUROC;
+  - routing: GPU-seconds per scene and empirical conformal coverage.
+  See the proposal §6.
 
 **Results** (`results/metrics.csv` → rendered here). ⚠️ Only compare rows scored against the same images: original-JPG and undistorted rows aren't comparable (`docs/failures.md` F1.3). For comparison with published results, use the provided `images_4` with the official poses and `--data_factor 1`, as the published 3DGS results do (`02` notebook). Published 3DGS garden at 30k: PSNR 27.41, SSIM 0.868, LPIPS 0.103 (Kerbl et al. 2023, per-scene table; check before quoting).
 
@@ -540,7 +600,12 @@ Part-time, roughly 10–12 h/week.
 | 9 | 3 | Code-based editing, camera paths | Path videos |
 | 10 | 3 | Compression + web viewer | Public link |
 | 11 | 3 | Demo video + README polish | **MVP** |
-| 12+ | 4 | Stretch goals | Extended results + write-up |
+| 12-14 | 4 | R1: VGGT / VGGT+BA vs COLMAP, 3DGS on each | Baseline table |
+| 15-18 | 4 | R2: chunking, alignment, label generator | ≥ 100 labelled chunks |
+| 19-23 | 4 | R3: signals + predictor | H1/H2 answered |
+| 24-27 | 4 | R4: conformal router, failure set | Risk–coverage plots |
+| 28-31 | 4 | R5: benchmark + ablations | All tables |
+| 32-35 | 4 | R6: paper | arXiv + submission |
 
 ```mermaid
 gantt
@@ -555,8 +620,13 @@ gantt
     Reconstruction & tuning     :p2, after p1, 28d
     section Phase 3
     Interactive twin (MVP)      :p3, after p2, 28d
-    section Phase 4
-    Stretch goals               :p4, after p3, 42d
+    section Phase 4 research
+    R1 baselines                :r1, after p3, 21d
+    R2 chunk labels             :r2, after r1, 28d
+    R3 signals + predictor      :r3, after r2, 35d
+    R4 conformal router         :r4, after r3, 28d
+    R5 benchmark + ablations    :r5, after r4, 28d
+    R6 paper                    :r6, after r5, 28d
 ```
 
 ---
@@ -608,6 +678,10 @@ gantt
   - Don't use it to operate or assist vehicles or robots, so keep the Phase 4 navigation agent on your own scenes.
   - Whether a job-hunting portfolio counts as "non-commercial" isn't spelled out. If that matters to you, ask legal@wayve.ai.
 - For your own captures, avoid identifiable people or blur them.
+- **Research track models** (my reading; check each licence before use):
+  - The VGGT original checkpoint and VGGT-Ω are under non-commercial research licences: fine for the paper, not for a product. VGGT-1B-Commercial requires an application.
+  - SuperPoint weights are non-commercial, so use **ALIKED or DISK with LightGlue**.
+  - The original Inria 3DGS code is non-commercial; this repo uses **gsplat** (Apache-2.0).
 
 ---
 
@@ -656,12 +730,14 @@ The project counts as complete when:
 - [x] Demo video (28 s cut, `docs/media/demo.mp4`)
 - [ ] **MVP** (left: check the viewer on a phone / a stranger's machine)
 
-**Phase 4: Stretch**
-- [ ] VGGT vs COLMAP
-- [ ] 2DGS geometry
-- [ ] Semantic twin
-- [ ] Navigation agent
-- [ ] Write-up published
+**Phase 4: Research track (HybridSfM, rendering-aware routing)**
+- [x] R0: proposal + literature check ([`docs/research/`](docs/research/hybridsfm_proposal.md))
+- [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each
+- [ ] R2: chunking, alignment, ≥ 100 labelled chunks
+- [ ] R3: signals + predictor (H1/H2)
+- [ ] R4: conformal router + failure set (H3/H4)
+- [ ] R5: full benchmark + ablations
+- [ ] R6: paper on arXiv + submission
 
 ---
 
@@ -676,6 +752,18 @@ The project counts as complete when:
 - Schönberger & Frahm, *Structure-from-Motion Revisited* (COLMAP), CVPR 2016. [colmap.github.io](https://colmap.github.io/)
 - Pan et al., *Global Structure-from-Motion Revisited* (GLOMAP), ECCV 2024. [repo](https://github.com/colmap/glomap)
 - Wang et al., *VGGT: Visual Geometry Grounded Transformer*, CVPR 2025. [repo](https://github.com/facebookresearch/vggt)
+
+**Research track** (2026 preprints from a web search on 2026-11-15; read before citing)
+- *VGGT-Ω*, CVPR 2026. [arXiv 2605.15195](https://arxiv.org/abs/2605.15195)
+- *VGGT-Long*, 2025. [arXiv 2507.16443](https://arxiv.org/abs/2507.16443) · *SwiftVGGT*, 2025. [arXiv 2511.18290](https://arxiv.org/abs/2511.18290)
+- *GGPT: Geometry-Grounded Point Transformer*, CVPR 2026. [arXiv 2603.11174](https://arxiv.org/abs/2603.11174)
+- *MASt3R-SfM*, 2024. [arXiv 2409.19152](https://arxiv.org/abs/2409.19152) · *VGGSfM*, CVPR 2024. [arXiv 2312.04563](https://arxiv.org/abs/2312.04563)
+- *LightGlue*, ICCV 2023. [arXiv 2306.13643](https://arxiv.org/abs/2306.13643) · *ALIKED*, 2023. [arXiv 2304.03608](https://arxiv.org/abs/2304.03608)
+- *GeoCond*, 2026. [arXiv 2609.18465](https://arxiv.org/abs/2609.18465) · *ReVar3R*, 2026. [arXiv 2610.07883](https://arxiv.org/abs/2610.07883)
+- *Does VGGT Know What It Does Not Know?*, 2026. [arXiv 2610.35806](https://arxiv.org/abs/2610.35806)
+- *A Calibration Audit of Confidence in Feed-Forward 3D Reconstruction Models*, 2026. [arXiv 2608.29705](https://arxiv.org/abs/2608.29705)
+- *Can These Views Be One Scene?*, 2026. [alphaXiv 2605.18754](https://www.alphaxiv.org/abs/2605.18754) · *When Wider Views Fail*, 2026. [arXiv 2609.24839](https://arxiv.org/abs/2609.24839)
+- Angelopoulos et al., *Conformal Risk Control*, ICLR 2024. [arXiv 2208.02814](https://arxiv.org/abs/2208.02814)
 
 **Datasets**
 - Barron et al., *Mip-NeRF 360*, CVPR 2022. [project page](https://jonbarron.info/mipnerf360/)
