@@ -1,2 +1,7 @@
 *.splat binary
 *.ply binary
+*.pdf binary
+*.gif binary
+*.mp4 binary
+*.jpg binary
+*.png binary
