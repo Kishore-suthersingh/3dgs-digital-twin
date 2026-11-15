@@ -497,7 +497,7 @@ Exit criteria (**MVP**):
 | ID | Weeks | Work |
 |---|---|---|
 | R0 | 0 | Proposal + literature check ✅ |
-| R1 | 1-3 | VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table: pose error **and** 3DGS PSNR; VGGT memory per chunk size on a T4. **Notebook ready:** [`04_r1_vggt_baselines.ipynb`](notebooks/04_r1_vggt_baselines.ipynb) (Kaggle) |
+| R1 | 1-3 | VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table: pose error **and** 3DGS PSNR; VGGT memory per chunk size on a T4. **Notebook ready:** [Colab](notebooks/04_r1_vggt_baselines_colab.ipynb) (resumes from Drive) or [Kaggle](notebooks/04_r1_vggt_baselines.ipynb) |
 | R2 | 4-7 | Chunking, Sim(3) alignment, Kaggle label generator (reuses `02c`); ≥ 100 labelled chunks |
 | R3 | 8-12 | Signals + predictor; H1/H2 (vs native confidence) |
 | R4 | 13-16 | Conformal router + own failure set; H3/H4 |
