@@ -133,7 +133,7 @@ def summarize(records, steps=3000, long_steps=7000, fail_loss=FAIL_LOSS):
         vals = [(get(c, m)["focal_err"] if k == "focal_err" else get(c, m)["pose"].get(k)) for c, m in rows]
         rho, n = spearman([np.nan if v is None else v for v in vals], [loss[c][m] for c, m in rows])
         res["pose_vs_loss"][k] = rho
-        L.append(f"| {k} | {rho:+.2f} | {n} |")
+        L.append(f"| {k} | {'– (all equal)' if np.isnan(rho) else f'{rho:+.2f}'} | {n} |")
 
     # ---- 5. fidelity: short vs long recipe
     pairs = [(psnr(get(c, m, "own", steps)), psnr(get(c, m, "own", long_steps)))
