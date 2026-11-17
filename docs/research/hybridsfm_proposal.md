@@ -187,7 +187,7 @@ flowchart LR
 | bicycle | VGGT + BA | out of GPU memory (F-R1.3) | | | |
 
 **What it means for the paper:**
-- **H1 is supported early.** The standard pose metrics (AUC@30, RRA@5) are saturated: VGGT scores 0.995 and 1.0. Yet its twin is 4.2 dB worse than the reference. Only sub-degree error ranks the methods correctly. So routing should be trained on **downstream** labels, and the pose metrics need tighter thresholds (AUC@3/@1, focal error). These are added for R2.
+- **H1 is supported early.** The standard pose metrics (AUC@30, RRA@5) are saturated: VGGT scores 0.995 and 1.0. Yet its twin is 4.2 dB worse than the reference. Only sub-degree error ranks the methods correctly. So routing should be trained on **downstream** labels, and the pose metrics need tighter thresholds (AUC@3/@1, focal error). These will be added in R2.
 - **There is no single best reconstructor:**
   - on garden, COLMAP wins on quality, at about 10× the time;
   - on bicycle with sparse views, COLMAP loses 66% of the cameras, while VGGT registers all 32 but with a poor twin.
