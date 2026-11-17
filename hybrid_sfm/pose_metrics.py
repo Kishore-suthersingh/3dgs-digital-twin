@@ -3,7 +3,10 @@
 Metrics (the usual ones in the VGGT / VGGSfM / MASt3R-SfM papers):
 - RRA@τ / RTA@τ: share of image pairs whose relative rotation / relative translation direction error is < τ°.
   Translation direction is sign-ambiguous for some methods, so its error is min(e, 180 - e).
-- AUC@30: mean over τ = 1..30 of the share of pairs with max(rotation error, translation error) < τ.
+- AUC@T: mean over 30 evenly spaced τ in (0, T] of the share of pairs with max(rotation error, translation error) < τ.
+  AUC@30 uses τ = 1..30 (the usual definition). AUC@3 and AUC@5 resolve the sub-degree errors that matter for
+  3DGS: in R1, VGGT scored AUC@30 = 0.995 and RRA@5 = 1.0 and still lost 4.2 dB of PSNR.
+- focal_error: median relative error of f / image width against the reference (R2).
 - ATE: RMSE of camera centres after a Sim(3) (Umeyama) alignment to the reference, divided by the
   reference's scene scale (median distance of reference centres to their mean), in percent.
 Images the method failed to register count as 180° error for every pair they are in, so methods that
@@ -63,11 +66,13 @@ def pose_errors(pred, ref, names=None):
             tr_err.append(min(e, 180.0 - e))
     rot_err, tr_err = np.array(rot_err), np.array(tr_err)
     worst = np.maximum(rot_err, tr_err)
-    for tau in (5, 15):
+    for tau in (1, 5, 15):
         out[f"RRA@{tau}"] = float((rot_err < tau).mean()) if len(worst) else float("nan")
         out[f"RTA@{tau}"] = float((tr_err < tau).mean()) if len(worst) else float("nan")
-    out["AUC@30"] = float(np.mean([(worst < t).mean() for t in range(1, 31)])) if len(worst) else float("nan")
+    for T in (3, 5, 30):
+        out[f"AUC@{T}"] = float(np.mean([(worst < t).mean() for t in np.arange(1, 31) * T / 30])) if len(worst) else float("nan")
     out["rot_err_median"] = float(np.median(rot_err)) if len(rot_err) else float("nan")
+    out["tr_err_median"] = float(np.median(tr_err)) if len(tr_err) else float("nan")
 
     if len(reg) >= 3:
         C_ref = np.array([centre(*ref[n]) for n in reg])
@@ -79,3 +84,19 @@ def pose_errors(pred, ref, names=None):
     else:
         out["ATE_%"] = float("nan")
     return out
+
+
+def _f_over_w(cam):
+    p, m = np.asarray(cam["params"], float), cam["model"]
+    f = (p[0] + p[1]) / 2 if m in ("PINHOLE", "OPENCV", "OPENCV_FISHEYE", "FULL_OPENCV", "THIN_PRISM_FISHEYE") else p[0]
+    return f / cam["width"]
+
+
+def focal_error(pred_model, ref_model, names=None):
+    """Median |f/W - f_ref/W_ref| / (f_ref/W_ref) over registered images (models as in colmap_io)."""
+    ref = {im["name"]: _f_over_w(ref_model["cameras"][im["camera_id"]]) for im in ref_model["images"].values()}
+    pred = {im["name"]: _f_over_w(pred_model["cameras"][im["camera_id"]]) for im in pred_model["images"].values()}
+    names = [n for n in (names if names is not None else ref) if n in pred and n in ref]
+    if not names:
+        return float("nan")
+    return float(np.median([abs(pred[n] - ref[n]) / ref[n] for n in names]))

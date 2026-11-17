@@ -184,7 +184,7 @@ Keep logging training time, GPU type, #Gaussians and file size for every run.
 │   └── export.py             # .ply → .sog / .spz
 ├── notebooks/          # exploration, plots for the write-up
 ├── viewer/             # web viewer (deployed via GitHub Pages)
-├── hybrid_sfm/         # (Phase 4) research code. Now: colmap_io, pose_metrics, vggt_memory, run_colmap + tests
+├── hybrid_sfm/         # (Phase 4) research code: colmap_io, pose_metrics, chunks, run_classical, vggt_colmap_lowmem, r2_tools, r2_summary + tests
 │   │                   # planned layout from the HybridSfM PDF §5:
 │   ├── preprocess/ retrieval/ vggt_runner/ verify/ classical/
 │   ├── align/ ba/ dense/ eval/ configs/
@@ -498,7 +498,7 @@ Exit criteria (**MVP**):
 |---|---|---|
 | R0 | 0 | Proposal + literature check ✅ |
 | R1 | 1-3 | VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table: pose error **and** 3DGS PSNR; VGGT memory per chunk size on a T4. First run done on garden and bicycle (results below); [Colab](notebooks/04_r1_vggt_baselines_colab.ipynb) / [Kaggle](notebooks/04_r1_vggt_baselines.ipynb) |
-| R2 | 4-7 | Chunking, Sim(3) alignment, Kaggle label generator (reuses `02c`); ≥ 100 labelled chunks |
+| R2 | 4-7 | Chunk-level label generator: 7 Mip-NeRF 360 scenes × 15 chunks (windows, wide-baseline strides, random sets; 12-40 images). Per chunk: classical (ALIKED + LightGlue → COLMAP mapper), VGGT, VGGT+BA, each scored with tighter pose metrics (AUC@3/@5, focal error) and a 3k-step 3DGS label against the official poses. Also a 3k-vs-7k fidelity check and an initialisation control (reference points moved into each method's frame). **Notebook ready, tested locally:** [Kaggle](notebooks/05_r2_labels.ipynb) (recommended, ~20 GPU-h in 2 runs) or [Colab](notebooks/05_r2_labels_colab.ipynb) |
 | R3 | 8-12 | Signals + predictor; H1/H2 (vs native confidence) |
 | R4 | 13-16 | Conformal router + own failure set; H3/H4 |
 | R5 | 17-20 | Full benchmark, baselines (VGGT-Long, MASt3R-SfM, confidence threshold, oracle), ablations |
@@ -626,7 +626,7 @@ Part-time, roughly 10–12 h/week.
 | 10 | 3 | Compression + web viewer | Public link |
 | 11 | 3 | Demo video + README polish | **MVP** |
 | 12-14 | 4 | R1: VGGT / VGGT+BA vs COLMAP, 3DGS on each | Baseline table |
-| 15-18 | 4 | R2: chunking, alignment, label generator | ≥ 100 labelled chunks |
+| 15-18 | 4 | R2: chunk label generator | ≥ 100 labelled chunks |
 | 19-23 | 4 | R3: signals + predictor | H1/H2 answered |
 | 24-27 | 4 | R4: conformal router, failure set | Risk–coverage plots |
 | 28-31 | 4 | R5: benchmark + ablations | All tables |
@@ -758,7 +758,7 @@ The project counts as complete when:
 **Phase 4: Research track (HybridSfM, rendering-aware routing)**
 - [x] R0: proposal + literature check ([`docs/research/`](docs/research/hybridsfm_proposal.md))
 - [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each. Garden is complete; bicycle VGGT+BA ran out of memory, and the table scene hasn't been run yet (results in Phase 4)
-- [ ] R2: chunking, alignment, ≥ 100 labelled chunks
+- [ ] R2: ≥ 100 labelled chunks (`05` notebook ready and tested locally on synthetic data; not yet run on a GPU)
 - [ ] R3: signals + predictor (H1/H2)
 - [ ] R4: conformal router + failure set (H3/H4)
 - [ ] R5: full benchmark + ablations

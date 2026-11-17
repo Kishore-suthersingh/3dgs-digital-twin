@@ -167,7 +167,7 @@ flowchart LR
 |---|---|---|---|
 | R0 | 0 | This proposal, literature check | ✅ |
 | R1 | 1–3 | Baselines: VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table. Pose error plus 3DGS PSNR on each set of poses. Measure VGGT memory per chunk size on a T4. Notebook: [Colab](../../notebooks/04_r1_vggt_baselines_colab.ipynb) / [Kaggle](../../notebooks/04_r1_vggt_baselines.ipynb) | A table like README §10's "our COLMAP vs official poses" rows, with VGGT rows added. **First run done** (§8.1); open: bicycle VGGT+BA, the table scene |
-| R2 | 4–7 | Chunking, Sim(3) alignment, the label generator (Kaggle) | Labels for ≥ 100 chunks; short-vs-30k PSNR Spearman ρ reported |
+| R2 | 4–7 | The chunk label generator: [Kaggle](../../notebooks/05_r2_labels.ipynb) / [Colab](../../notebooks/05_r2_labels_colab.ipynb). 105 chunks from 7 scenes, 3 reconstructors, tighter pose metrics, 3k-step 3DGS labels, 3k-vs-7k fidelity and an initialisation control. Chunk *merging* (Sim(3) alignment of routed chunks into one scene) moves to R4, where the router's output is assembled | Labels for ≥ 100 chunks; short-vs-long PSNR Spearman ρ reported |
 | R3 | 8–12 | Signals and predictor | H1/H2 answered: AUROC/AURC vs native confidence |
 | R4 | 13–16 | Conformal router and failure set | H3/H4 answered; risk–coverage plots |
 | R5 | 17–20 | Full benchmark, all baselines, ablations | All tables filled |
@@ -193,7 +193,7 @@ flowchart LR
   - on bicycle with sparse views, COLMAP loses 66% of the cameras, while VGGT registers all 32 but with a poor twin.
   
   This is the trade-off the router must learn.
-- **Confound to remove in R2:** the starting point clouds differ by method (100k vs 8.9k vs 3k points). We will train each method once from its own points and once from a shared random/reference initialisation, to isolate the pose effect.
+- **Confound to remove in R2:** the starting point clouds differ by method (100k vs 8.9k vs 3k points). R2 trains each method once from its own points and once from the reference points moved into its frame (`r2_tools.swap_points`), on 2 chunks per scene, to isolate the pose effect.
 
 ## 9. Risks and mitigations
 

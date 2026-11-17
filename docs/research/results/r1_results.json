@@ -1,0 +1,319 @@
+{
+ "gpu": "Tesla T4",
+ "vggt_commit": "a288dd0",
+ "n_views": 32,
+ "steps": 7000,
+ "cap": 300000,
+ "memory": {
+  "gpu": "Tesla T4",
+  "dtype": "torch.float16",
+  "weights_gb": 5.03,
+  "total_gb": 15.64,
+  "rows": [
+   {
+    "images": 8,
+    "peak_gb": 8.19,
+    "seconds": 4.86,
+    "status": "ok"
+   },
+   {
+    "images": 16,
+    "peak_gb": 8.71,
+    "seconds": 8.31,
+    "status": "ok"
+   },
+   {
+    "images": 24,
+    "peak_gb": 9.82,
+    "seconds": 15.26,
+    "status": "ok"
+   },
+   {
+    "images": 32,
+    "peak_gb": 10.93,
+    "seconds": 24.8,
+    "status": "ok"
+   },
+   {
+    "images": 40,
+    "peak_gb": 12.04,
+    "seconds": 38.48,
+    "status": "ok"
+   },
+   {
+    "images": 48,
+    "peak_gb": 13.17,
+    "seconds": 55.31,
+    "status": "ok"
+   },
+   {
+    "images": 64,
+    "peak_gb": null,
+    "seconds": null,
+    "status": "out of memory"
+   }
+  ]
+ },
+ "scenes": {
+  "garden": {
+   "gt": {
+    "pose": {
+     "n_images": 32,
+     "n_registered": 32,
+     "registered": 1.0,
+     "RRA@5": 1.0,
+     "RTA@5": 1.0,
+     "RRA@15": 1.0,
+     "RTA@15": 1.0,
+     "AUC@30": 1.0,
+     "rot_err_median": 0.0,
+     "ATE_%": 3.1596942650293304e-14
+    },
+    "recon": {},
+    "val": {
+     "psnr": 22.52264976501465,
+     "ssim": 0.6525237560272217,
+     "lpips": 0.3486625552177429,
+     "ellipse_time": 0.007998287677764893,
+     "num_GS": 300000
+    },
+    "train": {
+     "mem": 0.533754825592041,
+     "ellipse_time": 309.3756580352783,
+     "num_GS": 300000
+    },
+    "status": "finished"
+   },
+   "colmap": {
+    "pose": {
+     "n_images": 32,
+     "n_registered": 32,
+     "registered": 1.0,
+     "RRA@5": 1.0,
+     "RTA@5": 1.0,
+     "RRA@15": 1.0,
+     "RTA@15": 1.0,
+     "AUC@30": 1.0,
+     "rot_err_median": 0.050710044962637146,
+     "ATE_%": 0.09271856344237135
+    },
+    "recon": {
+     "method": "colmap",
+     "wall_s": 991.6,
+     "args": "<scene>",
+     "status": "ok",
+     "colmap": {
+      "models": 1,
+      "registered": 32,
+      "points": 17272,
+      "extract_s": 144.4,
+      "match_s": 819.0,
+      "map_s": 27.7,
+      "total_s": 991.0,
+      "pycolmap": "3.10.0"
+     }
+    },
+    "val": {
+     "psnr": 21.760265350341797,
+     "ssim": 0.5795985460281372,
+     "lpips": 0.41544145345687866,
+     "ellipse_time": 0.011085867881774902,
+     "num_GS": 300000
+    },
+    "train": {
+     "mem": 0.5459189414978027,
+     "ellipse_time": 311.6238143444061,
+     "num_GS": 300000
+    },
+    "status": "finished"
+   },
+   "vggt": {
+    "pose": {
+     "n_images": 32,
+     "n_registered": 32,
+     "registered": 1.0,
+     "RRA@5": 1.0,
+     "RTA@5": 1.0,
+     "RRA@15": 1.0,
+     "RTA@15": 1.0,
+     "AUC@30": 0.9946908602150537,
+     "rot_err_median": 0.48422312155893515,
+     "ATE_%": 0.8715810503297808
+    },
+    "recon": {
+     "method": "vggt",
+     "wall_s": 95.1,
+     "args": "--scene_dir <scene> --conf_thres_value 2",
+     "status": "ok",
+     "points": 100000
+    },
+    "val": {
+     "psnr": 18.32318878173828,
+     "ssim": 0.3033689856529236,
+     "lpips": 0.5405095815658569,
+     "ellipse_time": 0.009581267833709717,
+     "num_GS": 300000
+    },
+    "train": {
+     "mem": 0.531163215637207,
+     "ellipse_time": 341.51260566711426,
+     "num_GS": 300000
+    },
+    "status": "finished"
+   },
+   "vggt_ba": {
+    "pose": {
+     "n_images": 32,
+     "n_registered": 32,
+     "registered": 1.0,
+     "RRA@5": 1.0,
+     "RTA@5": 1.0,
+     "RRA@15": 1.0,
+     "RTA@15": 1.0,
+     "AUC@30": 0.9994623655913979,
+     "rot_err_median": 0.17928349390644674,
+     "ATE_%": 0.4198594963104382
+    },
+    "recon": {
+     "method": "vggt_ba",
+     "wall_s": 150.5,
+     "args": "--scene_dir <scene> --use_ba --max_query_pts 2048 --query_frame_num 5 --no_fine_tracking",
+     "status": "ok",
+     "points": 8858
+    },
+    "val": {
+     "psnr": 20.619312286376953,
+     "ssim": 0.48533767461776733,
+     "lpips": 0.49075284600257874,
+     "ellipse_time": 0.011220991611480713,
+     "num_GS": 200932
+    },
+    "train": {
+     "mem": 0.4350013732910156,
+     "ellipse_time": 324.9961540699005,
+     "num_GS": 200932
+    },
+    "status": "finished"
+   }
+  },
+  "bicycle": {
+   "gt": {
+    "pose": {
+     "n_images": 32,
+     "n_registered": 32,
+     "registered": 1.0,
+     "RRA@5": 1.0,
+     "RTA@5": 1.0,
+     "RRA@15": 1.0,
+     "RTA@15": 1.0,
+     "AUC@30": 1.0,
+     "rot_err_median": 0.0,
+     "ATE_%": 2.5729965991555703e-14
+    },
+    "recon": {},
+    "val": {
+     "psnr": 19.06844139099121,
+     "ssim": 0.40268057584762573,
+     "lpips": 0.5598753690719604,
+     "ellipse_time": 0.009798407554626465,
+     "num_GS": 163562
+    },
+    "train": {
+     "mem": 0.3816523551940918,
+     "ellipse_time": 275.5579397678375,
+     "num_GS": 163562
+    },
+    "status": "finished"
+   },
+   "colmap": {
+    "pose": {
+     "n_images": 32,
+     "n_registered": 11,
+     "registered": 0.34375,
+     "RRA@5": 0.11088709677419355,
+     "RTA@5": 0.11088709677419355,
+     "RRA@15": 0.11088709677419355,
+     "RTA@15": 0.11088709677419355,
+     "AUC@30": 0.11088709677419353,
+     "rot_err_median": 180.0,
+     "ATE_%": 0.2512110631204004
+    },
+    "recon": {
+     "method": "colmap",
+     "wall_s": 1151.5,
+     "args": "<scene>",
+     "status": "ok",
+     "colmap": {
+      "models": 1,
+      "registered": 11,
+      "points": 457,
+      "extract_s": 160.1,
+      "match_s": 988.3,
+      "map_s": 2.9,
+      "total_s": 1151.3,
+      "pycolmap": "3.10.0"
+     }
+    },
+    "val": {
+     "psnr": 16.167076110839844,
+     "ssim": 0.34977683424949646,
+     "lpips": 0.6483356952667236,
+     "ellipse_time": 0.006406426429748535,
+     "num_GS": 10139
+    },
+    "train": {
+     "mem": 0.21978092193603516,
+     "ellipse_time": 298.85679149627686,
+     "num_GS": 10139
+    },
+    "status": "finished"
+   },
+   "vggt": {
+    "pose": {
+     "n_images": 32,
+     "n_registered": 32,
+     "registered": 1.0,
+     "RRA@5": 1.0,
+     "RTA@5": 0.9435483870967742,
+     "RRA@15": 1.0,
+     "RTA@15": 0.9979838709677419,
+     "AUC@30": 0.956989247311828,
+     "rot_err_median": 0.9470670860226704,
+     "ATE_%": 2.5034787560949607
+    },
+    "recon": {
+     "method": "vggt",
+     "wall_s": 97.9,
+     "args": "--scene_dir <scene> --conf_thres_value 2",
+     "status": "ok",
+     "points": 2966
+    },
+    "val": {
+     "psnr": 14.197633743286133,
+     "ssim": 0.2454962432384491,
+     "lpips": 0.7022079229354858,
+     "ellipse_time": 0.02790224552154541,
+     "num_GS": 67152
+    },
+    "train": {
+     "mem": 0.8429279327392578,
+     "ellipse_time": 427.22677874565125,
+     "num_GS": 67152
+    },
+    "status": "finished"
+   },
+   "vggt_ba": {
+    "pose": null,
+    "recon": {
+     "method": "vggt_ba",
+     "wall_s": 115.2,
+     "args": "--scene_dir <scene> --use_ba --max_query_pts 2048 --query_frame_num 5 --no_fine_tracking",
+     "status": "failed: torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU"
+    },
+    "val": null,
+    "train": null,
+    "status": "skipped: failed: torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU"
+   }
+  }
+ }
+}
