@@ -149,7 +149,12 @@ flowchart LR
 
 ## 7. Compute plan (free T4s)
 
-- **VGGT-1B in fp16** on a T4 (no bf16, no FlashAttention 2): about 30–50 images per chunk is expected. **Measure this first in R1.**
+- **VGGT-1B in fp16** on a T4 (no bf16, no FlashAttention 2), **measured in R1:**
+  - 8 images: 8.2 GB peak, 5 s;
+  - 32 images: 10.9 GB peak, 25 s;
+  - 48 images: 13.2 GB peak, 55 s;
+  - 64 images: out of memory.
+  - So R2 uses chunks of about 40 images. VGGT+BA needs extra memory for track prediction (F-R1.3).
 - **Label cost:** about 300 chunks × 3–4 reconstructors × about 3 min of gsplat ≈ **60 GPU-hours**.
   - Colab and Kaggle together give about 30 h a week.
   - Committed Kaggle runs keep going with the tab closed.
@@ -161,12 +166,34 @@ flowchart LR
 | ID | Weeks | Work | Exit criterion |
 |---|---|---|---|
 | R0 | 0 | This proposal, literature check | ✅ |
-| R1 | 1–3 | Baselines: VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table. Pose error plus 3DGS PSNR on each set of poses. Measure VGGT memory per chunk size on a T4. Notebook: [Colab](../../notebooks/04_r1_vggt_baselines_colab.ipynb) / [Kaggle](../../notebooks/04_r1_vggt_baselines.ipynb) | A table like README §10's "our COLMAP vs official poses" rows, with VGGT rows added |
+| R1 | 1–3 | Baselines: VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table. Pose error plus 3DGS PSNR on each set of poses. Measure VGGT memory per chunk size on a T4. Notebook: [Colab](../../notebooks/04_r1_vggt_baselines_colab.ipynb) / [Kaggle](../../notebooks/04_r1_vggt_baselines.ipynb) | A table like README §10's "our COLMAP vs official poses" rows, with VGGT rows added. **First run done** (§8.1); open: bicycle VGGT+BA, the table scene |
 | R2 | 4–7 | Chunking, Sim(3) alignment, the label generator (Kaggle) | Labels for ≥ 100 chunks; short-vs-30k PSNR Spearman ρ reported |
 | R3 | 8–12 | Signals and predictor | H1/H2 answered: AUROC/AURC vs native confidence |
 | R4 | 13–16 | Conformal router and failure set | H3/H4 answered; risk–coverage plots |
 | R5 | 17–20 | Full benchmark, all baselines, ablations | All tables filled |
 | R6 | 21–24 | Writing, arXiv, code and label release | Submitted |
+
+### 8.1 R1 first results (Colab T4, Nov 2026)
+
+32 evenly spaced views per scene. Every method gets the same 3DGS recipe: MCMC 300k cap, 7k steps, every 8th view held out. Full table: README Phase 4.
+
+| Scene | Poses | Registered | AUC@30 | Median rot. err. | PSNR (Δ vs official poses) |
+|---|---|---|---|---|---|
+| garden | COLMAP | 32/32 | 1.000 | 0.05° | 21.76 (−0.76) |
+| garden | VGGT + BA | 32/32 | 0.999 | 0.18° | 20.62 (−1.90) |
+| garden | VGGT | 32/32 | 0.995 | 0.48° | 18.32 (−4.20) |
+| bicycle | COLMAP | 11/32 | 0.111 | – | not comparable (11 images) |
+| bicycle | VGGT | 32/32 | 0.957 | 0.95° | 14.20 (−4.87) |
+| bicycle | VGGT + BA | out of GPU memory (F-R1.3) | | | |
+
+**What it means for the paper:**
+- **H1 is supported early.** The standard pose metrics (AUC@30, RRA@5) are saturated: VGGT scores 0.995 and 1.0. Yet its twin is 4.2 dB worse than the reference. Only sub-degree error ranks the methods correctly. So routing should be trained on **downstream** labels, and the pose metrics need tighter thresholds (AUC@3/@1, focal error). These are added for R2.
+- **There is no single best reconstructor:**
+  - on garden, COLMAP wins on quality, at about 10× the time;
+  - on bicycle with sparse views, COLMAP loses 66% of the cameras, while VGGT registers all 32 but with a poor twin.
+  
+  This is the trade-off the router must learn.
+- **Confound to remove in R2:** the starting point clouds differ by method (100k vs 8.9k vs 3k points). We will train each method once from its own points and once from a shared random/reference initialisation, to isolate the pose effect.
 
 ## 9. Risks and mitigations
 

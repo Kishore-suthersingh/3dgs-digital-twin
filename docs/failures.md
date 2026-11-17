@@ -4,6 +4,35 @@ What broke, why, and how it was fixed. Newest first within each phase.
 
 ---
 
+## Research track R1: VGGT vs COLMAP baselines (Colab T4, Nov 2026)
+
+### F-R1.4: gsplat crashed rendering its fly-through video after COLMAP registered only 11 images (bicycle)
+- **Symptom:** `TypeError: 1 <= k= 0 <=5 must hold` in `generate_interpolated_path` → `scipy.interpolate.splprep`, after training and evaluation had finished.
+- **Cause:** the video fits a spline through `camtoworlds[5:-5]`. With 11 registered cameras, that leaves 1, so the spline degree becomes 0.
+- **Fix:** R1 passes `--disable_video`. The scores were already saved before the crash.
+
+### F-R1.3: VGGT + BA runs out of memory on a T4 at 32 images
+- **Symptom:** `torch.cuda.OutOfMemoryError ... Tried to allocate 4.05 GiB` (garden), then 8.00 GiB (bicycle), inside track prediction for bundle adjustment.
+- **Cause:** `demo_colmap.py` keeps the 5 GB model on the GPU while it predicts tracks on images loaded at 1024 px.
+- **Fix, part 1:** `hybrid_sfm/vggt_colmap_lowmem.py` moves the model to the CPU after the forward pass, then tries lighter settings in turn: 2048 query points, 5 query frames, and finally no fine tracking. Garden then succeeded on the lightest setting: BA converged from 2.42 to 0.65 px in 8 s.
+- **Still open:** bicycle still asks for 8 GB. Next options:
+  - a lower track-loading resolution;
+  - BA on COLMAP matches with VGGT poses as the start (closer to GGPT);
+  - an L4 GPU.
+
+### F-R1.2: 3DGS on VGGT poses crashed: the VGGT model had no 3D points
+- **Symptom:** in gsplat's `Parser`, "Mean of empty slice", then `LinAlgError: Eigenvalues did not converge` in `align_principal_axes`.
+- **Cause:** the model had cameras but an empty point cloud, and gsplat initialises the Gaussians from the points. The likely reason is that VGGT's no-BA export keeps only pixels with depth confidence > 5, and on this T4/fp16 run none passed.
+- **Fix:** the notebook counts the points and rejects a model with fewer than 1,000. It retries with `--conf_thres_value 2`, then `1.01`. Poses don't depend on this threshold. Result: garden 100k points, bicycle 3.0k.
+- **Lesson:** a pose metric can look perfect on a reconstruction that is useless for the twin. Validate every output the next stage reads.
+
+### F-R1.1: Scene download cut off by a runtime restart, then never finished
+- **Symptom:** `FileNotFoundError: .../garden/cameras.txt`: `sparse/` was missing, but `images_4/` existed.
+- **Cause:** `get_scene` only checked for `images_4/`.
+- **Fix:** it now downloads whatever is missing or incomplete (via `.part` files) and writes a `.complete` marker at the end.
+
+---
+
 ## Phase 1: COLMAP poses (Colab, Nov 2026)
 
 ### F2.2: On Kaggle "T4 x2", gsplat silently trained on both GPUs

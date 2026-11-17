@@ -497,12 +497,36 @@ Exit criteria (**MVP**):
 | ID | Weeks | Work |
 |---|---|---|
 | R0 | 0 | Proposal + literature check ✅ |
-| R1 | 1-3 | VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table: pose error **and** 3DGS PSNR; VGGT memory per chunk size on a T4. **Notebook ready:** [Colab](notebooks/04_r1_vggt_baselines_colab.ipynb) (resumes from Drive) or [Kaggle](notebooks/04_r1_vggt_baselines.ipynb) |
+| R1 | 1-3 | VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table: pose error **and** 3DGS PSNR; VGGT memory per chunk size on a T4. First run done on garden and bicycle (results below); [Colab](notebooks/04_r1_vggt_baselines_colab.ipynb) / [Kaggle](notebooks/04_r1_vggt_baselines.ipynb) |
 | R2 | 4-7 | Chunking, Sim(3) alignment, Kaggle label generator (reuses `02c`); ≥ 100 labelled chunks |
 | R3 | 8-12 | Signals + predictor; H1/H2 (vs native confidence) |
 | R4 | 13-16 | Conformal router + own failure set; H3/H4 |
 | R5 | 17-20 | Full benchmark, baselines (VGGT-Long, MASt3R-SfM, confidence threshold, oracle), ablations |
 | R6 | 21-24 | Paper, arXiv, code + label release |
+
+**R1 first results** (Colab T4, 32 evenly spaced views per scene, the same 3DGS recipe for every method: MCMC 300k cap, 7k steps, every 8th view held out; reference = the official poses):
+
+| Scene | Poses from | Registered | Pose time | AUC@30 | Median rot. error | ATE | 3DGS PSNR | Δ vs reference | SSIM | LPIPS |
+|---|---|---|---|---|---|---|---|---|---|---|
+| garden | official (reference) | 32/32 | – | 1.000 | 0° | 0% | 22.52 | – | 0.653 | 0.349 |
+| garden | COLMAP | 32/32 | 16.5 min (CPU) | 1.000 | 0.05° | 0.09% | **21.76** | −0.76 dB | 0.580 | 0.415 |
+| garden | VGGT | 32/32 | 1.6 min | 0.995 | 0.48° | 0.87% | 18.32 | −4.20 dB | 0.303 | 0.541 |
+| garden | VGGT + BA | 32/32 | 2.5 min | 0.999 | 0.18° | 0.42% | 20.62 | −1.90 dB | 0.485 | 0.491 |
+| bicycle | official (reference) | 32/32 | – | 1.000 | 0° | 0% | 19.07 | – | 0.403 | 0.560 |
+| bicycle | COLMAP | **11/32** | 19.2 min (CPU) | 0.111 | 180° | 0.25%* | 16.17* | −2.90 dB* | 0.350 | 0.648 |
+| bicycle | VGGT | **32/32** | 1.6 min | 0.957 | 0.95° | 2.50% | 14.20 | −4.87 dB | 0.245 | 0.702 |
+| bicycle | VGGT + BA | – | – | – | – | – | out of GPU memory | – | – | – |
+
+\* Only on COLMAP's 11 registered images; its PSNR is scored on just the held-out images among those 11, so it is **not** comparable with the other rows.
+
+What this shows so far:
+- **Pose accuracy at standard thresholds doesn't predict twin quality.** VGGT's AUC@30 is 0.995 on garden, close to COLMAP's, yet its 3DGS is 4.2 dB worse. All three methods score RRA@5 = 1.0, but the median rotation error (COLMAP 0.05°, VGGT+BA 0.18°, VGGT 0.48°) ranks them exactly as PSNR does. Sub-degree errors, invisible at the usual 5–30° thresholds, cost several dB in rendering. This supports the research track's premise (H1): route on **rendering-aware** signals, not pose confidence alone.
+- **Which method wins depends on the scene.** On garden, COLMAP is best. On bicycle with sparse views, COLMAP loses 21 of 32 cameras, while VGGT places all 32 in 1.6 min, but with a poor twin.
+- **BA recovers part of the gap** on garden (+2.3 dB over plain VGGT), still 1.1 dB behind COLMAP. That makes VGGT+BA a real middle option for the router.
+- **Caveats:**
+  - The starting point clouds differ by method: VGGT 100k points with depth confidence > 2, VGGT+BA 8.9k, bicycle VGGT 3.0k. So the PSNR gaps mix pose, focal-length and initialisation effects. R2 separates them.
+  - VGGT+BA ran out of memory on bicycle even at its lightest settings: 8 GB requested by track prediction (F-R1.3 in [failures](docs/failures.md)).
+- **Memory, measured:** one VGGT pass in fp16 fits 48 images on a T4 (13.2 GB peak, 55 s). 64 runs out of memory. So R2 uses chunks of about 40 images.
 
 **Compute:** VGGT-1B in fp16 on a free T4; labels ≈ 300 chunks × 3-4 reconstructors × ~3 min gsplat ≈ 60 GPU-hours (Colab + committed Kaggle runs, one GPU pinned: F2.2).
 
@@ -733,7 +757,7 @@ The project counts as complete when:
 
 **Phase 4: Research track (HybridSfM, rendering-aware routing)**
 - [x] R0: proposal + literature check ([`docs/research/`](docs/research/hybridsfm_proposal.md))
-- [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each (`04` notebook + `hybrid_sfm/` I/O and metrics ready, tested locally; not yet run)
+- [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each. Garden is complete; bicycle VGGT+BA ran out of memory, and the table scene hasn't been run yet (results in Phase 4)
 - [ ] R2: chunking, alignment, ≥ 100 labelled chunks
 - [ ] R3: signals + predictor (H1/H2)
 - [ ] R4: conformal router + failure set (H3/H4)
