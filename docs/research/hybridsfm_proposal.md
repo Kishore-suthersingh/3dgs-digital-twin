@@ -195,6 +195,25 @@ flowchart LR
   This is the trade-off the router must learn.
 - **Confound to remove in R2:** the starting point clouds differ by method (100k vs 8.9k vs 3k points). R2 trains each method once from its own points and once from the reference points moved into its frame (`r2_tools.swap_points`), on 2 chunks per scene, to isolate the pose effect.
 
+### 8.2 R2 run 1 (Kaggle T4, Nov 2026)
+
+60 chunks (garden, bicycle, stump, bonsai × 15) of 16–40 images: consecutive windows, wide-baseline strides and random sets. Loss = 3k-step 3DGS PSNR below the same chunk on official poses; 10 dB when a method gives no usable twin. Full output: [r2_run1_summary.md](results/r2_run1_summary.md).
+
+| Policy | Mean loss | Median loss | Unusable twins | Mean pose time | Best on |
+|---|---|---|---|---|---|
+| always classical (ALIKED + LightGlue → COLMAP) | 3.10 dB | 1.52 dB | 13 | 32 s | 35/60 |
+| always VGGT | 2.84 dB | 2.77 dB | 0 | 75 s | 9/60 |
+| always VGGT + BA | 4.13 dB | 2.34 dB | 17 | 107 s | 16/60 |
+| **oracle (best per chunk)** | **1.16 dB** | **1.23 dB** | 0 | 60 s | – |
+
+**What it means for the paper:**
+- **H3 has headroom:** the per-chunk oracle cuts the loss of the best fixed policy by ~60% (2.84 → 1.16 dB) at lower mean pose time than always-VGGT. A router that captures half of that gap is already a clear result.
+- **H1 is supported at scale:** pose metrics correlate weakly with twin loss (|ρ| ≤ 0.21 for AUC@3/5/30, RRA@5, rotation error, ATE; focal error +0.30; n = 150). Caveat: pooled across chunks, so chunk difficulty is mixed in. R3 must also report within-chunk ranking accuracy, and use the chunk's reference PSNR as context, not as a feature (it is unknown at test time).
+- **Chunk type is a strong but incomplete signal:** classical wins windows (1.66 vs 3.38 dB) and fails on 13 chunks, mostly strides and random sets, where VGGT wins. Per-scene winners still differ (bonsai favours VGGT+BA, garden classical), so features beyond chunk type are needed.
+- **Labels are cheap and stable:** 3k steps ranks like 7k (ρ = 0.95, 28 runs). Each chunk costs ~8 min on a T4 for all four reconstructions and 3DGS runs.
+- **Initialisation:** the reference-points control removes 0.8–1.5 dB per method but keeps the order (classical 0.50, VGGT+BA 0.52, VGGT 1.86 dB), so most of VGGT's gap is pose and intrinsics.
+- **Open:** VGGT+BA fails on 17/60 chunks (9 of 12 40-image chunks outside garden; 8/15 on stump, some of only 16 images). The failure logs (`r2/r2_logs`) decide whether this is memory (F-R1.3) or BA itself. Either way, failure is a label the router must learn to predict.
+
 ## 9. Risks and mitigations
 
 | Risk | Mitigation |
