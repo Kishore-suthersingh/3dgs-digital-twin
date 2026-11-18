@@ -212,7 +212,7 @@ flowchart LR
 - **Chunk type is a strong but incomplete signal:** classical wins windows (1.66 vs 3.38 dB) and fails on 13 chunks, mostly strides and random sets, where VGGT wins. Per-scene winners still differ (bonsai favours VGGT+BA, garden classical), so features beyond chunk type are needed.
 - **Labels are cheap and stable:** 3k steps ranks like 7k (ρ = 0.95, 28 runs). Each chunk costs ~8 min on a T4 for all four reconstructions and 3DGS runs.
 - **Initialisation:** the reference-points control removes 0.8–1.5 dB per method but keeps the order (classical 0.50, VGGT+BA 0.52, VGGT 1.86 dB), so most of VGGT's gap is pose and intrinsics.
-- **Open:** VGGT+BA fails on 17/60 chunks (9 of 12 40-image chunks outside garden; 8/15 on stump, some of only 16 images). The failure logs (`r2/r2_logs`) decide whether this is memory (F-R1.3) or BA itself. Either way, failure is a label the router must learn to predict.
+- **Open:** VGGT+BA fails on 17/60 chunks (9 of 12 40-image chunks outside garden; 8/15 on stump, some of only 16 images). The logs show 8 out-of-memory failures (all 40-image chunks) and 9 cases where VGGT's BA found too few track inliers per frame (sparse tracks at the T4-safe setting, wide baselines, low texture). Both are outcomes the router must learn to predict. Labels: [r2_labels.jsonl](results/r2/r2_labels.jsonl), chunk lists: [r2_chunks.json](results/r2/r2_chunks.json).
 
 ## 9. Risks and mitigations
 

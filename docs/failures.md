@@ -19,7 +19,10 @@ What broke, why, and how it was fixed. Newest first within each phase.
   - a lower track-loading resolution;
   - BA on COLMAP matches with VGGT poses as the start (closer to GGPT);
   - an L4 GPU.
-- **R2 run 1:** VGGT+BA gave no model on 17 of 60 chunks: bicycle 4, stump 8, bonsai 5 chunks. That is 9 of the 12 40-image chunks outside garden (garden: 0 failures), plus smaller chunks down to 16 images on stump, so not only memory. Reasons are in the run's `r2/r2_logs/*_vggt_ba_0.txt`; to be checked.
+- **R2 run 1:** VGGT+BA gave no model on 17 of 60 chunks (bicycle 4, stump 8, bonsai 5; garden 0). The logs show two causes:
+  - **Out of memory, 8 chunks**, all with 40 images: track prediction asks for 6.9–8.4 GB even with the model moved to the CPU.
+  - **"Not enough inliers per frame, skip BA", 9 chunks** of 16–40 images: VGGT's `demo_colmap` gives up when any frame has too few track inliers at 8 px. R2 runs the lightest setting (2048 query points, 5 query frames, no fine tracking), so tracks are sparse. Wide baselines (strides, random sets) and stump's low texture trigger it.
+  - **Decision:** run 2 keeps the same setting, so all labels are comparable. Both failures are real outcomes of VGGT+BA on a T4, and the router must learn to predict them. A later ablation can rerun these 17 chunks with denser tracks on a bigger GPU.
 
 ### F-R1.2: 3DGS on VGGT poses crashed: the VGGT model had no 3D points
 - **Symptom:** in gsplat's `Parser`, "Mean of empty slice", then `LinAlgError: Eigenvalues did not converge` in `align_principal_axes`.
