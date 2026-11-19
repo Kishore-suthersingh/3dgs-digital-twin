@@ -809,7 +809,7 @@ The project counts as complete when:
 - [x] R0: proposal + literature check ([`docs/research/`](docs/research/hybridsfm_proposal.md))
 - [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each. Garden is complete; bicycle VGGT+BA ran out of memory, and the table scene hasn't been run yet (results in Phase 4)
 - [x] R2: ≥ 100 labelled chunks (105 chunks, 7 scenes; oracle 1.18 dB vs best fixed 2.53 dB; pose metrics |ρ| ≤ 0.18 with twin loss)
-- [ ] R3: signals + predictor (H1/H2). First predictor done: 66% of the oracle gap closed, leave-one-scene-out; nearly matched by a one-threshold rule on classical registration. Next: rendering-aware signals (warp SSIM, short 3DGS probe), cost-aware routing
+- [ ] R3: signals + predictor (H1/H2). First predictor done: 66% of the oracle gap closed, leave-one-scene-out; nearly matched by a one-threshold rule on classical registration. Next: R3b short 3DGS probes ([`06_r3b_probes.ipynb`](notebooks/06_r3b_probes.ipynb): 250/500/1,000-step held-out PSNR per candidate; notebook ready, tested locally, not yet run), then cost-aware routing
 - [ ] R4: conformal router + failure set (H3/H4)
 - [ ] R5: full benchmark + ablations
 - [ ] R6: paper on arXiv + submission

@@ -71,6 +71,47 @@ def load_targets(label_paths, steps=3000):
     return out
 
 
+def load_probes(path):
+    """R3b probes: {chunk: {method: {"status", "psnr": {step: dB}, "train_s": {step: s}}}} (later lines win)."""
+    P = {}
+    for line in open(path):
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        pr = r.get("probe") or {}
+        P.setdefault(r["chunk"], {})[r["method"]] = dict(
+            status=r["status"], psnr={int(k): v["psnr"] for k, v in pr.items()},
+            train_s={int(k): v.get("train_s") or 0.0 for k, v in pr.items()})
+    return P
+
+
+def probe_steps(P):
+    return sorted({s for d in P.values() for r in d.values() for s in r["psnr"]})
+
+
+def add_probe_features(F, names, P, step):
+    """Per method: probe PSNR at `step` and its gap to the chunk's best probe (NaN when the method can't be probed)."""
+    new = [f"probe_{m}_psnr" for m in METHODS] + [f"probe_{m}_gap" for m in METHODS]
+    F2 = {}
+    for c, x in F.items():
+        ps = [P.get(c, {}).get(m, {}).get("psnr", {}).get(step, np.nan) for m in METHODS]
+        best = np.nanmax(ps) if not np.all(np.isnan(ps)) else np.nan
+        F2[c] = np.concatenate([x, ps, [p - best for p in ps]])
+    return F2, names + new
+
+
+def probe_router(P, step, candidates=METHODS):
+    """Highest probe PSNR among the candidates that could be probed; VGGT (never fails in R2) if none."""
+    def choose(c):
+        ok = {m: P[c][m]["psnr"][step] for m in candidates if m in P.get(c, {}) and step in P[c][m]["psnr"]}
+        return max(ok, key=ok.get) if ok else "vggt"
+    return choose
+
+
+def probe_time(P, c, step, candidates=METHODS):
+    return sum(P[c][m]["train_s"].get(step, 0.0) for m in candidates if m in P.get(c, {}))
+
+
 # ------------------------------------------------------------------ routers
 def _losses(T, chunks):
     return np.array([[T[c]["loss"][m] for m in METHODS] for c in chunks])
@@ -143,8 +184,8 @@ def route_time(T, c, choice, probes):
     return sum(t[p] for p in probes) + (t[choice] if choice not in probes else 0.0)
 
 
-def evaluate(T, F, meta, names, seeds=(0, 1, 2, 3, 4), n_boot=2000):
-    chunks = sorted(c for c in T if c in F)
+def evaluate(T, F, meta, names, seeds=(0, 1, 2, 3, 4), n_boot=2000, P=None):
+    chunks = sorted(c for c in T if c in F and (P is None or c in P))
     scenes = sorted({meta[c]["scene"] for c in chunks})
     choice = {}                    # router -> {chunk: method}
     probes = {}                    # router -> probes it always runs
@@ -157,9 +198,19 @@ def evaluate(T, F, meta, names, seeds=(0, 1, 2, 3, 4), n_boot=2000):
         r = pose_router(T, metric, hb)
         name = f"pose-error router: {metric} (GT, not deployable)"
         choice[name] = {c: r(c) for c in chunks}; probes[name] = tuple(METHODS)
+    extra_t = {}                   # router -> {chunk: probe training seconds}
+    steps = probe_steps(P) if P else []
+    for st in steps:
+        for label, cand in [("all methods", METHODS), ("classical + VGGT", ("classical", "vggt"))]:
+            name = f"probe@{st}: best probe PSNR ({label})"
+            r = probe_router(P, st, cand)
+            choice[name] = {c: r(c) for c in chunks}; probes[name] = tuple(cand)
+            extra_t[name] = {c: probe_time(P, c, st, cand) for c in chunks}
     learned = {"learned: all features": (None, "rf", ("classical", "vggt")),
                "learned: VGGT probe only": (VGGT_ONLY, "rf", ("vggt",)),
                "learned: all features, gradient boosting": (None, "hgb", ("classical", "vggt"))}
+    for st in steps:
+        learned[f"learned: all features + probe@{st}"] = (None, "rf", tuple(METHODS), st)
     for g in GROUPS:
         learned[f"ablation: without {GROUPS[g]}"] = (tuple(k for k in GROUPS if k != g), "rf", ("classical", "vggt"))
     for name in ["best fixed (train)", "kind rule (metadata)", "best stump (train)"] + [f"stump: {f}" for f in STUMP_FEATURES] + list(learned):
@@ -178,10 +229,12 @@ def evaluate(T, F, meta, names, seeds=(0, 1, 2, 3, 4), n_boot=2000):
             choice["best stump (train)"][c] = stumps[bf][0](c)
             for f in STUMP_FEATURES:
                 choice[f"stump: {f}"][c] = stumps[f][0](c)
-        for name, (groups, model, _) in learned.items():
+        for name, spec in learned.items():
+            groups, model = spec[0], spec[1]
+            Fx, nx = add_probe_features(F, names, P, spec[3]) if len(spec) > 3 else (F, names)
             preds = []
             for seed in (seeds if model == "rf" else seeds[:1]):
-                p, imp = fit_forest(T, F, names, train, groups, seed, model)
+                p, imp = fit_forest(T, Fx, nx, train, groups, seed, model)
                 preds.append(p(test))
                 if name == "learned: all features":
                     importance.append(imp)
@@ -190,8 +243,10 @@ def evaluate(T, F, meta, names, seeds=(0, 1, 2, 3, 4), n_boot=2000):
                 choice[name][c] = METHODS[int(pl.argmin())]
                 if name == "learned: all features":
                     pred_loss[c] = pl
-    for name, (_, _, pr) in learned.items():
-        probes[name] = pr
+    for name, spec in learned.items():
+        probes[name] = spec[2]
+        if len(spec) > 3:
+            extra_t[name] = {c: probe_time(P, c, spec[3]) for c in chunks}
     for name in ["best fixed (train)", "kind rule (metadata)"]:
         probes[name] = ()
     for name in ["best stump (train)"] + [f"stump: {f}" for f in STUMP_FEATURES]:
@@ -211,17 +266,19 @@ def evaluate(T, F, meta, names, seeds=(0, 1, 2, 3, 4), n_boot=2000):
                          near=float((l - oracle <= NEAR_OPT_DB).mean()), fails=int((l >= FAIL_LOSS).sum()),
                          gap_closed=float((base.mean() - l.mean()) / (base.mean() - oracle.mean())),
                          vs_vggt=(float(d.mean()), float(lo), float(hi)),
-                         time=float(np.nanmean([route_time(T, c, ch[c], probes[name]) for c in chunks])),
+                         time=float(np.nanmean([route_time(T, c, ch[c], probes[name]) + extra_t.get(name, {}).get(c, 0.0)
+                                                for c in chunks])),
+                         probe_s=float(np.mean([extra_t.get(name, {}).get(c, 0.0) for c in chunks])),
                          picks={m: sum(ch[c] == m for c in chunks) for m in METHODS},
                          per_scene={s: float(np.mean([L[c][ch[c]] for c in chunks if meta[c]["scene"] == s])) for s in scenes})
     imp = {k: float(np.mean([d[k] for d in importance])) for k in importance[0]}
     grp = {g: sum(v for k, v in imp.items() if k.split("_")[0] == g) for g in GROUPS}
-    pair = pairwise_ranking(T, chunks, pred_loss)
+    pair = pairwise_ranking(T, chunks, pred_loss, P)
     return dict(n=len(chunks), scenes=scenes, results=res, importance=imp, group_importance=grp, pairwise=pair,
                 stump_pick=stump_pick, choice=choice)
 
 
-def pairwise_ranking(T, chunks, pred_loss):
+def pairwise_ranking(T, chunks, pred_loss, P=None):
     """Within a chunk, for each pair of usable methods whose PSNR differs by >= TIE_DB: does the score order them right?"""
     scores = {"AUC@3 (GT)": lambda c, m: -T[c]["pose"][m]["AUC@3"],
               "AUC@30 (GT)": lambda c, m: -T[c]["pose"][m]["AUC@30"],
@@ -229,6 +286,9 @@ def pairwise_ranking(T, chunks, pred_loss):
               "ATE (GT)": lambda c, m: T[c]["pose"][m]["ATE_%"],
               "focal error (GT)": lambda c, m: abs(T[c]["pose"][m]["focal_err"] or 0),
               "learned predicted loss (no GT)": lambda c, m: pred_loss[c][METHODS.index(m)]}
+    for st in (probe_steps(P) if P else []):
+        scores[f"probe PSNR at {st} steps (no GT)"] = (lambda st: lambda c, m: -P[c][m]["psnr"].get(st, -np.inf)
+                                                        if m in P.get(c, {}) else np.inf)(st)
     out = {}
     for name, sc in scores.items():
         right = n = 0
@@ -257,13 +317,13 @@ def report(E):
          f"scored on the 7th). Loss = dB below the official poses (3k-step 3DGS, {FAIL_LOSS:.0f} dB for no usable twin). "
          f"*Gap closed* = share of the always-VGGT → oracle gap recovered. *vs always VGGT* = mean loss difference "
          f"with a paired bootstrap 95% CI (negative = better). Pose time includes the probes a router needs "
-         f"(classical + VGGT forward for the full router).", "",
+         f"(classical + VGGT forward for the full router) and, for probe routers, the probes' 3DGS training time.", "",
          "| Router | Mean loss | Median | Regret | Near-oracle (≤0.5 dB) | Unusable | Gap closed | vs always VGGT (95% CI) | Pose time | Picks c / v / ba |",
          "|---|---|---|---|---|---|---|---|---|---|"]
     order = ["always classical", "always vggt", "always vggt_ba", "best fixed (train)", "kind rule (metadata)",
              "best stump (train)"] + [f"stump: {f}" for f in STUMP_FEATURES] + \
             ["learned: VGGT probe only", "learned: all features", "learned: all features, gradient boosting"] + \
-            [k for k in R if k.startswith("pose-error")] + ["oracle"]
+            [k for k in R if k.startswith("probe@")] + [k for k in R if "+ probe@" in k] +             [k for k in R if k.startswith("pose-error")] + ["oracle"]
     for k in order:
         r = R[k]
         d, lo, hi = r["vs_vggt"]
@@ -305,10 +365,11 @@ def main():
     ap.add_argument("features")
     ap.add_argument("labels", nargs="+")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--probes", help="R3b r3b_probes.jsonl: adds probe routers and probe features")
     a = ap.parse_args()
     F, meta, names = load_features(a.features)
     T = load_targets(a.labels)
-    E = evaluate(T, F, meta, names)
+    E = evaluate(T, F, meta, names, P=load_probes(a.probes) if a.probes else None)
     md = report(E)
     open(a.out, "w", encoding="utf-8").write(md)
     slim = {k: v for k, v in E.items() if k != "choice"}

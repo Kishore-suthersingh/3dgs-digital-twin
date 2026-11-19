@@ -86,6 +86,40 @@ def test_router_learns_a_feature_rule():
     assert "leave-one-scene-out" in md and "| sc0 |" in md
 
 
+def test_probe_routers():
+    """Probes that rank methods like the labels: the probe router reaches the oracle; time includes probe training."""
+    rng = np.random.default_rng(1)
+    rows, recs, probes = [], [], []
+    for s in range(3):
+        for i in range(8):
+            c = f"sc{s}_c{i}"
+            rows.append(dict(chunk=c, scene=f"sc{s}", kind="window", cls_registered=rng.uniform(), conf_mean=rng.uniform(),
+                             mv_consistent=rng.uniform(), agree_auc3=rng.uniform(), geo_nn_baseline=rng.uniform()))
+            ps = dict(classical=rng.uniform(20, 26), vggt=rng.uniform(20, 26))
+            recs += [_rec(c, "ref", 27.0), _rec(c, "classical", ps["classical"]), _rec(c, "vggt", ps["vggt"]),
+                     _rec(c, "vggt_ba", None, status="recon_failed")]
+            for r in recs[-4:]:
+                r["scene"] = f"sc{s}"
+            for m, v in ps.items():                      # probe = label - 3 dB + small noise that keeps the order
+                probes.append(dict(chunk=c, method=m, status="ok", probe={"500": dict(psnr=v - 3, train_s=12.0)}))
+            probes.append(dict(chunk=c, method="vggt_ba", status="recon_failed", probe=None))
+    with tempfile.TemporaryDirectory() as d:
+        fp, lp, pp = (os.path.join(d, x) for x in ("f.csv", "l.jsonl", "p.jsonl"))
+        with open(fp, "w", newline="") as fh:
+            wr = csv.DictWriter(fh, list(rows[0])); wr.writeheader(); wr.writerows(rows)
+        open(lp, "w").write("\n".join(json.dumps(r) for r in recs))
+        open(pp, "w").write("\n".join(json.dumps(r) for r in probes))
+        F, meta, names = rr.load_features(fp)
+        Tg, P = rr.load_targets([lp]), rr.load_probes(pp)
+    E = rr.evaluate(Tg, F, meta, names, seeds=(0,), n_boot=100, P=P)
+    R = E["results"]
+    k = "probe@500: best probe PSNR (all methods)"
+    assert R[k]["regret"] < 1e-9 and abs(R[k]["probe_s"] - 24.0) < 1e-9
+    assert R[k]["time"] > R["always vggt"]["time"]
+    assert "learned: all features + probe@500" in R and E["pairwise"]["probe PSNR at 500 steps (no GT)"][0] == 1.0
+    assert "probe@500" in rr.report(E)
+
+
 if __name__ == "__main__":
     for k, f in list(globals().items()):
         if k.startswith("test_"):
