@@ -195,24 +195,34 @@ flowchart LR
   This is the trade-off the router must learn.
 - **Confound to remove in R2:** the starting point clouds differ by method (100k vs 8.9k vs 3k points). R2 trains each method once from its own points and once from the reference points moved into its frame (`r2_tools.swap_points`), on 2 chunks per scene, to isolate the pose effect.
 
-### 8.2 R2 run 1 (Kaggle T4, Nov 2026)
+### 8.2 R2 results (Kaggle T4, Nov 2026)
 
-60 chunks (garden, bicycle, stump, bonsai × 15) of 16–40 images: consecutive windows, wide-baseline strides and random sets. Loss = 3k-step 3DGS PSNR below the same chunk on official poses; 10 dB when a method gives no usable twin. Full output: [r2_run1_summary.md](results/r2_run1_summary.md).
+105 chunks (7 Mip-NeRF 360 scenes × 15) of 12–40 images: consecutive windows, wide-baseline strides and random sets. Loss = 3k-step 3DGS PSNR below the same chunk on official poses; 10 dB when a method gives no usable twin. Full output: [r2_summary.md](results/r2_summary.md); labels: [r2_labels.jsonl](results/r2/r2_labels.jsonl) (518 records); chunk lists: [r2_chunks.json](results/r2/r2_chunks.json).
 
 | Policy | Mean loss | Median loss | Unusable twins | Mean pose time | Best on |
 |---|---|---|---|---|---|
-| always classical (ALIKED + LightGlue → COLMAP) | 3.10 dB | 1.52 dB | 13 | 32 s | 35/60 |
-| always VGGT | 2.84 dB | 2.77 dB | 0 | 75 s | 9/60 |
-| always VGGT + BA | 4.13 dB | 2.34 dB | 17 | 107 s | 16/60 |
-| **oracle (best per chunk)** | **1.16 dB** | **1.23 dB** | 0 | 60 s | – |
+| always classical (ALIKED + LightGlue → COLMAP) | 3.11 dB | 1.76 dB | 19 | 34 s | 49/105 |
+| always VGGT | 2.53 dB | 2.32 dB | 0 | 76 s | 21/105 |
+| always VGGT + BA | 4.17 dB | 2.23 dB | 31 | 110 s | 35/105 |
+| **oracle (best per chunk)** | **1.18 dB** | **1.12 dB** | 0 | 71 s | – |
+
+| Scene | classical | VGGT | VGGT + BA | Wins (classical / VGGT / VGGT+BA) | Unusable (classical / VGGT+BA) |
+|---|---|---|---|---|---|
+| garden | **1.25** | 2.60 | 2.15 | 14 / 1 / 0 | 0 / 0 |
+| bicycle | 3.43 | **3.05** | 3.75 | 9 / 2 / 4 | 5 / 4 |
+| stump | 4.06 | **2.47** | 5.98 | 7 / 4 / 4 | 6 / 8 |
+| bonsai | 3.65 | **3.23** | 4.66 | 5 / 2 / 8 | 2 / 5 |
+| counter | 3.08 | **1.23** | 3.10 | 3 / 3 / 9 | 3 / 4 |
+| kitchen | **2.70** | 3.76 | 4.75 | 9 / 1 / 5 | 0 / 3 |
+| room | 3.60 | **1.39** | 4.84 | 2 / 8 / 5 | 3 / 7 |
 
 **What it means for the paper:**
-- **H3 has headroom:** the per-chunk oracle cuts the loss of the best fixed policy by ~60% (2.84 → 1.16 dB) at lower mean pose time than always-VGGT. A router that captures half of that gap is already a clear result.
-- **H1 is supported at scale:** pose metrics correlate weakly with twin loss (|ρ| ≤ 0.21 for AUC@3/5/30, RRA@5, rotation error, ATE; focal error +0.30; n = 150). Caveat: pooled across chunks, so chunk difficulty is mixed in. R3 must also report within-chunk ranking accuracy, and use the chunk's reference PSNR as context, not as a feature (it is unknown at test time).
-- **Chunk type is a strong but incomplete signal:** classical wins windows (1.66 vs 3.38 dB) and fails on 13 chunks, mostly strides and random sets, where VGGT wins. Per-scene winners still differ (bonsai favours VGGT+BA, garden classical), so features beyond chunk type are needed.
-- **Labels are cheap and stable:** 3k steps ranks like 7k (ρ = 0.95, 28 runs). Each chunk costs ~8 min on a T4 for all four reconstructions and 3DGS runs.
-- **Initialisation:** the reference-points control removes 0.8–1.5 dB per method but keeps the order (classical 0.50, VGGT+BA 0.52, VGGT 1.86 dB), so most of VGGT's gap is pose and intrinsics.
-- **Open:** VGGT+BA fails on 17/60 chunks (9 of 12 40-image chunks outside garden; 8/15 on stump, some of only 16 images). The logs show 8 out-of-memory failures (all 40-image chunks) and 9 cases where VGGT's BA found too few track inliers per frame (sparse tracks at the T4-safe setting, wide baselines, low texture). Both are outcomes the router must learn to predict. Labels: [r2_labels.jsonl](results/r2/r2_labels.jsonl), chunk lists: [r2_chunks.json](results/r2/r2_chunks.json).
+- **H3 has headroom:** the per-chunk oracle cuts the loss of the best fixed policy by 53% (2.53 → 1.18 dB) at similar pose time. A router that captures half of that gap is already a clear result.
+- **H1 is supported at scale:** pose metrics correlate weakly with twin loss (|ρ| ≤ 0.18 for AUC@3/5/30, RRA@5, rotation error, ATE; focal error +0.26; n = 265). Caveat: pooled across chunks, so chunk difficulty is mixed in. R3 must also report within-chunk ranking accuracy.
+- **Chunk type is a strong but incomplete signal:** classical wins windows (1.88 vs 3.10 dB) and fails on 19 chunks, mostly strides and random sets, where VGGT wins. Per-scene winners still differ (garden/kitchen classical, room/counter VGGT, bonsai VGGT+BA by wins), so features beyond chunk type are needed.
+- **Label noise:** 3k steps ranks runs like 7k (ρ = 0.97, 51 runs), but the best method agrees on only 5/9 fidelity chunks. Near-ties are common, so R3 reports regret (dB lost vs the oracle) rather than top-1 accuracy, and the conformal step must budget for label noise.
+- **Initialisation:** the reference-points control removes 0.7–1.1 dB per method but keeps the order (classical 0.45, VGGT+BA 0.64, VGGT 1.82 dB), so most of VGGT's gap is pose and intrinsics.
+- **Failures are labels:** VGGT+BA fails on 31/105 chunks (19 out of memory, on 19 of the 28 40-image chunks, 12 with too few BA inliers per frame); classical leaves 19 chunks under 90% registration. One reference-points training run hit a CUDA error (room, classical); it only affects the init control.
 
 ## 9. Risks and mitigations
 

@@ -498,7 +498,7 @@ Exit criteria (**MVP**):
 |---|---|---|
 | R0 | 0 | Proposal + literature check ✅ |
 | R1 | 1-3 | VGGT and VGGT+BA vs COLMAP on garden, bicycle and the table: pose error **and** 3DGS PSNR; VGGT memory per chunk size on a T4. First run done on garden and bicycle (results below); [Colab](notebooks/04_r1_vggt_baselines_colab.ipynb) / [Kaggle](notebooks/04_r1_vggt_baselines.ipynb) |
-| R2 | 4-7 | Chunk-level label generator: 7 Mip-NeRF 360 scenes × 15 chunks (windows, wide-baseline strides, random sets; 12-40 images). Per chunk: classical (ALIKED + LightGlue → COLMAP mapper), VGGT, VGGT+BA, each scored with tighter pose metrics (AUC@3/@5, focal error) and a 3k-step 3DGS label against the official poses. Also a 3k-vs-7k fidelity check and an initialisation control (reference points moved into each method's frame). [Kaggle](notebooks/05_r2_labels.ipynb) / [Colab](notebooks/05_r2_labels_colab.ipynb). **Run 1 done: 60 chunks from 4 scenes** (results below); run 2 (counter, kitchen, room) pending |
+| R2 | 4-7 | Chunk-level label generator: 7 Mip-NeRF 360 scenes × 15 chunks (windows, wide-baseline strides, random sets; 12-40 images). Per chunk: classical (ALIKED + LightGlue → COLMAP mapper), VGGT, VGGT+BA, each scored with tighter pose metrics (AUC@3/@5, focal error) and a 3k-step 3DGS label against the official poses. Also a 3k-vs-7k fidelity check and an initialisation control (reference points moved into each method's frame). [Kaggle](notebooks/05_r2_labels.ipynb) / [Colab](notebooks/05_r2_labels_colab.ipynb). **Done: 105 chunks from 7 scenes** (results below) |
 | R3 | 8-12 | Signals + predictor; H1/H2 (vs native confidence) |
 | R4 | 13-16 | Conformal router + own failure set; H3/H4 |
 | R5 | 17-20 | Full benchmark, baselines (VGGT-Long, MASt3R-SfM, confidence threshold, oracle), ablations |
@@ -528,29 +528,34 @@ What this shows so far:
   - VGGT+BA ran out of memory on bicycle even at its lightest settings: 8 GB requested by track prediction (F-R1.3 in [failures](docs/failures.md)).
 - **Memory, measured:** one VGGT pass in fp16 fits 48 images on a T4 (13.2 GB peak, 55 s). 64 runs out of memory. So R2 uses chunks of about 40 images.
 
-**R2 run 1 results** (Kaggle T4, 8.9 h; garden, bicycle, stump, bonsai × 15 chunks = 60 chunks; 3k-step 3DGS labels; loss = PSNR below the same chunk trained on official poses, 10 dB if a method gives no usable twin; full summary: [r2_run1_summary.md](docs/research/results/r2_run1_summary.md)):
+**R2 results** (Kaggle T4, 2 runs, ~15 GPU-h; 7 Mip-NeRF 360 scenes × 15 chunks = **105 chunks**; 3k-step 3DGS labels; loss = PSNR below the same chunk trained on official poses, 10 dB if a method gives no usable twin; full summary: [r2_summary.md](docs/research/results/r2_summary.md), labels: [r2_labels.jsonl](docs/research/results/r2/r2_labels.jsonl)):
 
 | Policy | Mean loss | Median loss | Unusable twins | Mean pose time | Best on |
 |---|---|---|---|---|---|
-| always classical (ALIKED + LightGlue → COLMAP) | 3.10 dB | 1.52 dB | 13 | 32 s | 35/60 |
-| always VGGT | 2.84 dB | 2.77 dB | 0 | 75 s | 9/60 |
-| always VGGT + BA | 4.13 dB | 2.34 dB | 17 | 107 s | 16/60 |
-| **oracle (best per chunk)** | **1.16 dB** | **1.23 dB** | 0 | 60 s | – |
+| always classical (ALIKED + LightGlue → COLMAP) | 3.11 dB | 1.76 dB | 19 | 34 s | 49/105 |
+| always VGGT | 2.53 dB | 2.32 dB | 0 | 76 s | 21/105 |
+| always VGGT + BA | 4.17 dB | 2.23 dB | 31 | 110 s | 35/105 |
+| **oracle (best per chunk)** | **1.18 dB** | **1.12 dB** | 0 | 71 s | – |
 
-| Scene | classical | VGGT | VGGT + BA | Wins (classical / VGGT / VGGT+BA) |
-|---|---|---|---|---|
-| garden | **1.24** | 2.60 | 2.15 | 14 / 1 / 0 |
-| bicycle | 3.43 | **3.05** | 3.75 | 9 / 2 / 4 |
-| stump | 4.06 | **2.47** | 5.98 | 7 / 4 / 4 |
-| bonsai | 3.65 | **3.23** | 4.66 | 5 / 2 / 8 |
+Mean loss (dB) per scene:
+
+| Scene | classical | VGGT | VGGT + BA | Wins (classical / VGGT / VGGT+BA) | Unusable (classical / VGGT+BA) |
+|---|---|---|---|---|---|
+| garden | **1.25** | 2.60 | 2.15 | 14 / 1 / 0 | 0 / 0 |
+| bicycle | 3.43 | **3.05** | 3.75 | 9 / 2 / 4 | 5 / 4 |
+| stump | 4.06 | **2.47** | 5.98 | 7 / 4 / 4 | 6 / 8 |
+| bonsai | 3.65 | **3.23** | 4.66 | 5 / 2 / 8 | 2 / 5 |
+| counter | 3.08 | **1.23** | 3.10 | 3 / 3 / 9 | 3 / 4 |
+| kitchen | **2.70** | 3.76 | 4.75 | 9 / 1 / 5 | 0 / 3 |
+| room | 3.60 | **1.39** | 4.84 | 2 / 8 / 5 | 3 / 7 |
 
 What this shows:
-- **A router has room to win.** Picking the best method per chunk loses 1.16 dB on average, against 2.84 dB for the best fixed choice: about 60% less loss, at a mean pose time (60 s) below always-VGGT.
-- **The best method depends on the chunk.** Classical wins on consecutive windows (1.66 dB vs 3.38 for VGGT) but fails to register 13 of 60 chunks, mostly wide-baseline strides and random sets, where VGGT is best (2.39–2.60 dB, never unusable).
-- **Pose metrics barely predict twin quality (H1).** Over 150 trained (chunk, method) pairs, the Spearman correlation between pose metrics and loss stays within |ρ| ≤ 0.21 (AUC@3 −0.21, AUC@30 −0.14, RRA@5 even has the wrong sign); focal error does best at +0.30. This is pooled across chunks of different difficulty; R3 also tests within-chunk ranking.
-- **3k-step labels are reliable:** ρ = 0.95 against 7k steps (28 runs), same best method on 3 of 4 chunks with all labels.
-- **Initialisation matters, but doesn't explain the gap.** Training from the reference points instead of each method's own lowers the loss by 0.8 dB (classical), 1.2 dB (VGGT) and 1.5 dB (VGGT+BA); VGGT is still 1.4 dB behind classical afterwards.
-- **VGGT+BA failed on 17 of 60 chunks**, 9 of the 12 40-image chunks outside garden and 8 of 15 stump chunks, some of only 16 images (F-R1.3). Its failures are the main reason its mean loss is worst while its median is second best.
+- **A router has room to win.** Picking the best method per chunk loses 1.18 dB on average, against 2.53 dB for the best fixed choice (always VGGT): 53% less loss, at similar pose time.
+- **No method wins everywhere.** Classical wins consecutive windows (1.88 dB vs 3.10 for VGGT) and the garden and kitchen scenes, but gives no usable model on 19 chunks, mostly wide-baseline strides and random sets, where VGGT is best (2.02–2.33 dB, never unusable). VGGT+BA wins the most chunks after classical (35) but fails on 31.
+- **Pose metrics barely predict twin quality (H1).** Over 265 trained (chunk, method) pairs, the Spearman correlation between pose metrics and loss stays within |ρ| ≤ 0.18 (AUC@3 −0.18, AUC@30 −0.14, RRA@5 −0.01); focal error does best at +0.26. This is pooled across chunks of different difficulty; R3 also tests within-chunk ranking.
+- **3k-step labels track 7k steps** (ρ = 0.97, 51 runs), but the best method agrees on only 5 of 9 chunks, so several chunks have near-ties. R3 treats gaps below the label noise as ties.
+- **Initialisation matters, but doesn't explain the gap.** Reference points instead of each method's own lower the loss by 1.0 (classical), 0.7 (VGGT) and 1.1 dB (VGGT+BA); VGGT stays 1.4 dB behind classical.
+- **VGGT+BA failures:** 19 out of memory (19 of the 28 chunks with 40 images), 12 "too few inliers per frame" in VGGT's BA (sparse tracks at the T4-safe setting, wide baselines, low texture). See F-R1.3 in [failures](docs/failures.md).
 
 **Compute:** VGGT-1B in fp16 on a free T4; labels ≈ 300 chunks × 3-4 reconstructors × ~3 min gsplat ≈ 60 GPU-hours (Colab + committed Kaggle runs, one GPU pinned: F2.2).
 
@@ -782,7 +787,7 @@ The project counts as complete when:
 **Phase 4: Research track (HybridSfM, rendering-aware routing)**
 - [x] R0: proposal + literature check ([`docs/research/`](docs/research/hybridsfm_proposal.md))
 - [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each. Garden is complete; bicycle VGGT+BA ran out of memory, and the table scene hasn't been run yet (results in Phase 4)
-- [ ] R2: ≥ 100 labelled chunks (run 1: 60 chunks from 4 scenes, oracle 1.16 dB vs best fixed 2.84 dB; run 2 with the 3 indoor scenes pending)
+- [x] R2: ≥ 100 labelled chunks (105 chunks, 7 scenes; oracle 1.18 dB vs best fixed 2.53 dB; pose metrics |ρ| ≤ 0.18 with twin loss)
 - [ ] R3: signals + predictor (H1/H2)
 - [ ] R4: conformal router + failure set (H3/H4)
 - [ ] R5: full benchmark + ablations

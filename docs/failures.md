@@ -22,6 +22,7 @@ What broke, why, and how it was fixed. Newest first within each phase.
 - **R2 run 1:** VGGT+BA gave no model on 17 of 60 chunks (bicycle 4, stump 8, bonsai 5; garden 0). The logs show two causes:
   - **Out of memory, 8 chunks**, all with 40 images: track prediction asks for 6.9–8.4 GB even with the model moved to the CPU.
   - **"Not enough inliers per frame, skip BA", 9 chunks** of 16–40 images: VGGT's `demo_colmap` gives up when any frame has too few track inliers at 8 px. R2 runs the lightest setting (2048 query points, 5 query frames, no fine tracking), so tracks are sparse. Wide baselines (strides, random sets) and stump's low texture trigger it.
+  - **Run 2 (counter, kitchen, room):** 14 more: 11 out of memory (40-image chunks; these indoor scenes use the larger images_4), 3 too few inliers (room). **R2 total: 31/105 = 19 OOM + 12 too few inliers.**
   - **Decision:** run 2 keeps the same setting, so all labels are comparable. Both failures are real outcomes of VGGT+BA on a T4, and the router must learn to predict them. A later ablation can rerun these 17 chunks with denser tracks on a bigger GPU.
 
 ### F-R1.2: 3DGS on VGGT poses crashed: the VGGT model had no 3D points
