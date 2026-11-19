@@ -224,6 +224,29 @@ flowchart LR
 - **Initialisation:** the reference-points control removes 0.7–1.1 dB per method but keeps the order (classical 0.45, VGGT+BA 0.64, VGGT 1.82 dB), so most of VGGT's gap is pose and intrinsics.
 - **Failures are labels:** VGGT+BA fails on 31/105 chunks (19 out of memory, on 19 of the 28 40-image chunks, 12 with too few BA inliers per frame); classical leaves 19 chunks under 90% registration. One reference-points training run hit a CUDA error (room, classical); it only affects the init control.
 
+### 8.3 R3 first results (Nov 2026)
+
+32 features per chunk (VGGT confidence, camera layout, focal consistency, multi-view depth consistency, classical reconstruction statistics, VGGT-vs-classical agreement), none from the reference. One random forest per method predicts its loss; the router picks the lowest. Leave-one-scene-out over 105 chunks; 95% CIs by paired bootstrap. Full report: [r3_results.md](results/r3/r3_results.md); features: [features.csv](results/r3/features.csv).
+
+| Router (fitted on 6 scenes, scored on the 7th) | Mean loss | Regret vs oracle | Within 0.5 dB of oracle | Unusable | Gap closed | vs always VGGT (95% CI) | Pose time |
+|---|---|---|---|---|---|---|---|
+| always VGGT (best fixed) | 2.53 | 1.35 | 31% | 0 | 0% | – | 76 s |
+| kind rule (uses how the chunk was built) | 2.04 | 0.86 | 50% | 1 | 36% | −0.49 [−0.79, −0.23] | 61 s |
+| one threshold: classical registered fraction | 1.68 | 0.50 | 70% | 0 | 63% | −0.86 [−1.17, −0.56] | 110 s |
+| one threshold: VGGT mean confidence | 3.11 | 1.93 | 24% | 6 | −43% | +0.58 [+0.22, +1.03] | 110 s |
+| learned: VGGT probe only | 2.15 | 0.97 | 55% | 0 | 28% | −0.38 [−0.57, −0.19] | 113 s |
+| **learned: all features** (random forest) | **1.65** | **0.46** | **71%** | **0** | **66%** | **−0.89 [−1.16, −0.64]** | 122 s |
+| learned: all features (gradient boosting) | 1.60 | 0.42 | 76% | 0 | 69% | −0.93 [−1.22, −0.64] | 133 s |
+| best pose error vs ground truth (AUC@3; not deployable) | 1.60 | 0.42 | 70% | 0 | 69% | −0.94 [−1.21, −0.69] | 220 s |
+| oracle | 1.18 | 0 | 100% | 0 | 100% | −1.35 | 71 s |
+
+**What it means for the paper (honest reading):**
+- **H3, partly:** routing closes 66–69% of the gap with no unusable twins, significantly better than any fixed policy. But it doesn't yet use less compute than always-VGGT: both probes are always run.
+- **The strong baseline is simple.** A single threshold on the classical registered fraction gets 63%. The paper must include it, and a learned router has to beat it clearly. Today the difference (0.03 dB) is within noise.
+- **H1 refined:** pose metrics fail as *absolute* predictors of twin quality across chunks (R2: |ρ| ≤ 0.18) but rank methods within a chunk 72–75% correctly. The defensible claim: pose error is neither available at test time nor sufficient. Routing on ground-truth pose error still leaves 0.37–0.43 dB regret, and the learned router without any ground truth matches it.
+- **H2, not yet tested properly.** The only rendering-adjacent signal so far, multi-view depth consistency, adds little on top of classical statistics (ablation −0.02 dB), and VGGT's native confidence is worse than useless as a router. The next signals are the ones the proposal centres on: photometric warp consistency on the real images, and a short 3DGS probe (~500 steps) per candidate. They need a GPU run over the R2 chunks.
+- **Small data:** 105 chunks from 7 scenes. Per-scene variance is large (kitchen is the one held-out scene where always-classical beats the router). More scenes (Tanks & Temples, the own failure set) are needed before the conformal step (R4) can give a meaningful guarantee.
+
 ## 9. Risks and mitigations
 
 | Risk | Mitigation |

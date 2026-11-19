@@ -557,6 +557,27 @@ What this shows:
 - **Initialisation matters, but doesn't explain the gap.** Reference points instead of each method's own lower the loss by 1.0 (classical), 0.7 (VGGT) and 1.1 dB (VGGT+BA); VGGT stays 1.4 dB behind classical.
 - **VGGT+BA failures:** 19 out of memory (19 of the 28 chunks with 40 images), 12 "too few inliers per frame" in VGGT's BA (sparse tracks at the T4-safe setting, wide baselines, low texture). See F-R1.3 in [failures](docs/failures.md).
 
+**R3 first results** (local CPU; 32 features per chunk from a VGGT forward pass and the classical reconstruction, nothing from the reference poses; leave-one-scene-out over the 105 R2 chunks; full report: [r3_results.md](docs/research/results/r3/r3_results.md)):
+
+| Router (fitted on 6 scenes, scored on the 7th) | Mean loss | Regret vs oracle | Within 0.5 dB of oracle | Unusable | Gap closed | vs always VGGT (95% CI) | Pose time |
+|---|---|---|---|---|---|---|---|
+| always VGGT (best fixed) | 2.53 | 1.35 | 31% | 0 | 0% | – | 76 s |
+| kind rule (uses how the chunk was built) | 2.04 | 0.86 | 50% | 1 | 36% | −0.49 [−0.79, −0.23] | 61 s |
+| one threshold: classical registered fraction | 1.68 | 0.50 | 70% | 0 | 63% | −0.86 [−1.17, −0.56] | 110 s |
+| one threshold: VGGT mean confidence | 3.11 | 1.93 | 24% | 6 | −43% | +0.58 [+0.22, +1.03] | 110 s |
+| learned: VGGT probe only | 2.15 | 0.97 | 55% | 0 | 28% | −0.38 [−0.57, −0.19] | 113 s |
+| **learned: all features** (random forest) | **1.65** | **0.46** | **71%** | **0** | **66%** | **−0.89 [−1.16, −0.64]** | 122 s |
+| learned: all features (gradient boosting) | 1.60 | 0.42 | 76% | 0 | 69% | −0.93 [−1.22, −0.64] | 133 s |
+| best pose error vs ground truth (AUC@3; not deployable) | 1.60 | 0.42 | 70% | 0 | 69% | −0.94 [−1.21, −0.69] | 220 s |
+| oracle | 1.18 | 0 | 100% | 0 | 100% | −1.35 | 71 s |
+
+What this shows:
+- **The learned router works:** two-thirds of the always-VGGT → oracle gap closed (2.53 → 1.65 dB), never an unusable twin, and on every held-out scene except kitchen (+0.47 dB vs always classical) it is the best non-oracle policy. Biggest wins: bicycle 3.05 → 0.89 dB, stump 2.47 → 1.28 dB.
+- **But a one-line rule gets almost all of it.** "Use classical if it registers enough images, else VGGT" reaches 1.68 dB. The forest adds 0.03 dB on average; its edge is choosing VGGT+BA on some chunks. Classical's own statistics carry the signal: removing them drops the router to 17% of the gap; removing any other group costs ≤ 0.1 dB.
+- **VGGT's native confidence is a poor router** (worse than always-VGGT), and VGGT-only features close just 28%. So far the cheap probe that matters is the classical reconstruction itself.
+- **H1 needs refining.** Pose error vs ground truth ranks two methods *on the same chunk* correctly 72–75% of the time (pairs ≥ 0.3 dB apart), and routing on it reaches 1.55–1.61 dB. Pose metrics are poor at predicting *how good* a twin will be across chunks (R2, |ρ| ≤ 0.18), but decent at ranking methods within one. Even ground-truth pose error leaves 0.4 dB to the oracle, which is the room for rendering-aware signals (H2).
+- **Cost:** the router runs both probes, so its pose time (122 s) is above always-VGGT (76 s). A cost-aware version and the 3DGS-probe signal are next.
+
 **Compute:** VGGT-1B in fp16 on a free T4; labels ≈ 300 chunks × 3-4 reconstructors × ~3 min gsplat ≈ 60 GPU-hours (Colab + committed Kaggle runs, one GPU pinned: F2.2).
 
 ---
@@ -788,7 +809,7 @@ The project counts as complete when:
 - [x] R0: proposal + literature check ([`docs/research/`](docs/research/hybridsfm_proposal.md))
 - [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each. Garden is complete; bicycle VGGT+BA ran out of memory, and the table scene hasn't been run yet (results in Phase 4)
 - [x] R2: ≥ 100 labelled chunks (105 chunks, 7 scenes; oracle 1.18 dB vs best fixed 2.53 dB; pose metrics |ρ| ≤ 0.18 with twin loss)
-- [ ] R3: signals + predictor (H1/H2)
+- [ ] R3: signals + predictor (H1/H2). First predictor done: 66% of the oracle gap closed, leave-one-scene-out; nearly matched by a one-threshold rule on classical registration. Next: rendering-aware signals (warp SSIM, short 3DGS probe), cost-aware routing
 - [ ] R4: conformal router + failure set (H3/H4)
 - [ ] R5: full benchmark + ablations
 - [ ] R6: paper on arXiv + submission
