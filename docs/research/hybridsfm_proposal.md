@@ -245,7 +245,7 @@ flowchart LR
 - **The strong baseline is simple.** A single threshold on the classical registered fraction gets 63%. The paper must include it, and a learned router has to beat it clearly. Today the difference (0.03 dB) is within noise.
 - **H1 refined:** pose metrics fail as *absolute* predictors of twin quality across chunks (R2: |ρ| ≤ 0.18) but rank methods within a chunk 72–75% correctly. The defensible claim: pose error is neither available at test time nor sufficient. Routing on ground-truth pose error still leaves 0.37–0.43 dB regret, and the learned router without any ground truth matches it.
 - **H2, not yet tested properly.** The only rendering-adjacent signal so far, multi-view depth consistency, adds little on top of classical statistics (ablation −0.02 dB), and VGGT's native confidence is worse than useless as a router. The next signals are the ones the proposal centres on: photometric warp consistency on the real images, and a short 3DGS probe (~500 steps) per candidate. They need a GPU run over the R2 chunks.
-- **Small data:** 105 chunks from 7 scenes. Per-scene variance is large (kitchen is the one held-out scene where always-classical beats the router). More scenes (Tanks & Temples, the own failure set) are needed before the conformal step (R4) can give a meaningful guarantee.
+- **Small data:** 105 chunks from 7 scenes. Per-scene variance is large (the router beats both fixed policies on 4 of 7 held-out scenes; on kitchen always-classical is 0.47 dB better). More scenes (Tanks & Temples, the own failure set) are needed before the conformal step (R4) can give a meaningful guarantee.
 
 ## 9. Risks and mitigations
 

@@ -572,7 +572,7 @@ What this shows:
 | oracle | 1.18 | 0 | 100% | 0 | 100% | −1.35 | 71 s |
 
 What this shows:
-- **The learned router works:** two-thirds of the always-VGGT → oracle gap closed (2.53 → 1.65 dB), never an unusable twin, and on every held-out scene except kitchen (+0.47 dB vs always classical) it is the best non-oracle policy. Biggest wins: bicycle 3.05 → 0.89 dB, stump 2.47 → 1.28 dB.
+- **The learned router works:** two-thirds of the always-VGGT → oracle gap closed (2.53 → 1.65 dB), never an unusable twin. Per held-out scene it beats both fixed policies on 4 of 7; on garden and room it is within 0.1 dB of the better fixed choice, and on kitchen 0.47 dB behind always-classical. Biggest wins: bicycle 3.05 → 0.89 dB, stump 2.47 → 1.28 dB.
 - **But a one-line rule gets almost all of it.** "Use classical if it registers enough images, else VGGT" reaches 1.68 dB. The forest adds 0.03 dB on average; its edge is choosing VGGT+BA on some chunks. Classical's own statistics carry the signal: removing them drops the router to 17% of the gap; removing any other group costs ≤ 0.1 dB.
 - **VGGT's native confidence is a poor router** (worse than always-VGGT), and VGGT-only features close just 28%. So far the cheap probe that matters is the classical reconstruction itself.
 - **H1 needs refining.** Pose error vs ground truth ranks two methods *on the same chunk* correctly 72–75% of the time (pairs ≥ 0.3 dB apart), and routing on it reaches 1.55–1.61 dB. Pose metrics are poor at predicting *how good* a twin will be across chunks (R2, |ρ| ≤ 0.18), but decent at ranking methods within one. Even ground-truth pose error leaves 0.4 dB to the oracle, which is the room for rendering-aware signals (H2).
