@@ -7,11 +7,14 @@ import tempfile
 
 import numpy as np
 
+NL = chr(10)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(HERE)))
 sys.path.insert(0, HERE)
 from hybrid_sfm import r3_router as rr  # noqa: E402
 from hybrid_sfm import r4_cascade as r4  # noqa: E402
+from hybrid_sfm import r4b_gain as r4b  # noqa: E402
 from test_r2 import _rec  # noqa: E402
 
 
@@ -61,6 +64,37 @@ def test_cascade_end_to_end():
         assert E["crc"][k][0.05]["esc"] >= E["crc"][k][0.3]["esc"]               # stricter alpha -> more escalation
     md = r4.report(E, "fig.png")
     assert "Conformal risk control" in md and "hindsight" in md
+
+
+def test_gain_cascade_end_to_end():
+    """VGGT+BA is much better on every third chunk, and the early probe of VGGT reveals which (low VGGT PSNR there)."""
+    rng = np.random.default_rng(4)
+    rows, recs, probes = [], [], []
+    for s in range(4):
+        for i in range(12):
+            c, hard = f"sc{s}_c{i}", i % 3 == 0
+            rows.append(dict(chunk=c, scene=f"sc{s}", kind="window", cls_registered=rng.uniform(), conf_mean=rng.uniform()))
+            ps = dict(classical=20.0, vggt=19.0 if hard else 23.0, vggt_ba=25.0 if hard else 22.5)
+            recs += [_rec(c, "ref", 26.0, wall=0)] + [_rec(c, m, v, wall=w) for (m, v), w in zip(ps.items(), (30, 70, 100))]
+            for r in recs[-4:]:
+                r["scene"] = f"sc{s}"
+            probes += [dict(chunk=c, method=m, status="ok", probe={"250": dict(psnr=v - 4, train_s=4.0),
+                                                                    "1000": dict(psnr=v - 2, train_s=16.0)}) for m, v in ps.items()]
+    with tempfile.TemporaryDirectory() as d:
+        fp, lp, pp = (os.path.join(d, x) for x in ("f.csv", "l.jsonl", "p.jsonl"))
+        with open(fp, "w", newline="") as fh:
+            wr = csv.DictWriter(fh, list(rows[0])); wr.writeheader(); wr.writerows(rows)
+        open(lp, "w").write(NL.join(json.dumps(r) for r in recs))
+        open(pp, "w").write(NL.join(json.dumps(r) for r in probes))
+        F, meta, names = rr.load_features(fp)
+        T, P = rr.load_targets([lp]), rr.load_probes(pp)
+    E = r4b.evaluate(T, F, meta, names, P, early=250, seeds=(0,), n_splits=50)
+    b = E["base"]
+    assert b["stage2"]["time"] == 30 + 70 + 100 + 48 and abs(b["stage2"]["loss"] - b["oracle"]) < 1e-9
+    # the early probe already exposes the hard chunks, so stage 1.5 picks VGGT+BA there without probing it:
+    assert abs(b["stage15"]["loss"] - b["oracle"]) < 1e-9 and b["stage15"]["time"] < b["stage2"]["time"]
+    assert b["helps"] == b["hurts"] == 0 and E["curve"][-1]["esc"] == 1.0 and E["curve"][0]["esc"] == 0.0
+    assert "predicted gain" in r4b.report([E], None)
 
 
 if __name__ == "__main__":

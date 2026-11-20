@@ -290,6 +290,21 @@ Stage 1 runs classical + VGGT; the geometric router (R3) picks a method and pred
 - **H3, partly:** the cascade gets 1.46 dB at 73% of the full-probe cost. That's a real trade-off curve, but the escalation score is the bottleneck: at 10–20% escalation, predicted loss and decision margin are no better than random, while hindsight escalation of 20% would reach 1.36 dB, beating "probe everything". **Next (R4b):** an escalation score aimed at the probe's own gain (does probing help here?), for example from a cheap 250-step probe of the classical + VGGT pair (~7 s), trained to predict the escalation gain rather than the loss.
 - **The failure set is still to build** (phone captures: low texture, wide baselines, motion). Without it, H4's out-of-distribution claim rests on 7 Mip-NeRF 360 scenes only.
 
+### 8.6 R4b: predicting the escalation gain (negative result)
+
+Stage 1.5 adds an early probe of the cheap pair (250 or 500 steps, ~4–9 s each). A random forest on the 32 geometric features plus the early probe predicts the gain from escalating (loss before − loss after, possibly negative). Nested and out-of-scene, as R4. Report: [r4b_results.md](results/r4/r4b_results.md).
+
+| Policy | Escalated | Mean loss | Mean time | Realized risk |
+|---|---|---|---|---|
+| R4 stage 1 only | 0% | 1.63 dB | 123 s | 0.28 |
+| R4b stage 1.5 only (early probe @250) | 0% | 1.60 dB | 125 s | 0.25 |
+| R4 cascade, α = 0.1 (predicted loss) | 51% | 1.46 dB | 192 s | 0.095 |
+| R4b cascade, α = 0.1 (predicted gain, @250) | 72% | 1.49 dB | 224 s | 0.095 |
+| R4b cascade, α = 0.1 (predicted gain, @500) | 74% | 1.49 dB | 230 s | 0.057 |
+| always escalate | 100% | 1.42 dB | 264 s | 0 |
+
+**Reading:** the gain is real (helps on 29 chunks, median +0.8 dB, 12 over 1 dB; hurts on 16, median −0.6 dB) but unpredictable from pre-BA signals (Spearman ρ = 0.02 / −0.05). Conformal control remains valid. For the paper this is a useful negative: **the value of VGGT+BA for the twin can't be forecast from VGGT's output, the classical reconstruction, or an early probe of either.** It has to be measured. The cost lever therefore moves into BA itself (a cheaper BA variant, or an early-exit test after a few BA iterations), which is future work rather than more routing features.
+
 ## 9. Risks and mitigations
 
 | Risk | Mitigation |

@@ -622,6 +622,10 @@ What this shows:
 - **The cascade buys most of the probe's gain for half its extra cost.** At α = 0.1 it escalates half the chunks and reaches 1.46 dB at 192 s, against 1.42 dB at 264 s for probing everything. Random escalation at the same cost: 1.56 dB.
 - **But the escalation score is weak at small budgets.** Escalating the top 10–20% by predicted loss is barely better than random, while escalating the *right* 20% (hindsight) would reach 1.36 dB, *better* than probing everything. That's because the probe makes things worse on 16 chunks and better on 29. A better escalation score is the main open problem, and the place where the paper can still gain.
 
+**R4b (negative result): predicting the gain from escalating.** An early 250/500-step probe of classical + VGGT was added to stage 1, and a model was trained to predict *whether escalating helps* rather than how bad a chunk is ([r4b_results.md](docs/research/results/r4/r4b_results.md)). The early probe improves the cheap stage slightly (1.63 → 1.60 dB for +2 s). But the predicted gain is uncorrelated with the true gain (Spearman ρ = 0.02 at 250 steps, −0.05 at 500), so the cascade gets no better than R4 (α = 0.1: 1.49 dB at 224 s vs R4's 1.46 dB at 192 s). The guarantee still holds (realized risk ≤ α at every α).
+
+The effect being predicted is real, not noise: escalating helps on 29 chunks (median +0.8 dB, 12 of them > 1 dB) and hurts on 16 (median −0.6 dB). What's missing is information: whether VGGT+BA will beat the cheap pair isn't visible in anything measured before running it. So the remaining cost lever is VGGT+BA itself: a cheaper bundle-adjustment variant, or an early-exit signal from inside BA.
+
 **Compute:** VGGT-1B in fp16 on a free T4; labels ≈ 300 chunks × 3-4 reconstructors × ~3 min gsplat ≈ 60 GPU-hours (Colab + committed Kaggle runs, one GPU pinned: F2.2).
 
 ---
@@ -854,7 +858,7 @@ The project counts as complete when:
 - [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each. Garden is complete; bicycle VGGT+BA ran out of memory, and the table scene hasn't been run yet (results in Phase 4)
 - [x] R2: ≥ 100 labelled chunks (105 chunks, 7 scenes; oracle 1.18 dB vs best fixed 2.53 dB; pose metrics |ρ| ≤ 0.18 with twin loss)
 - [x] R3: signals + predictor (H1/H2). Geometric router 66% of the oracle gap (≈ a one-threshold rule, 63%); R3b 1,000-step 3DGS probe 83%, significantly better (−0.26 dB, CI [−0.44, −0.10]) and better at ranking than ground-truth pose error (80% vs ≤ 75%)
-- [ ] R4: conformal router + failure set (H3/H4). Conformal cascade done: α = 0.1 holds on held-out scenes (risk 0.095), 1.46 dB at 192 s vs 1.42 dB at 264 s for probing everything; per-scene coverage fails on 2–4/7 scenes; escalation score near random at small budgets. Open: a better escalation score, the own failure set
+- [ ] R4: conformal router + failure set (H3/H4). Conformal cascade done: α = 0.1 holds on held-out scenes (risk 0.095), 1.46 dB at 192 s vs 1.42 dB at 264 s for probing everything; per-scene coverage fails on 2–4/7 scenes; escalation score near random at small budgets. R4b: predicting the escalation gain fails (ρ ≈ 0); the gain from VGGT+BA isn't visible before running it. Open: the own failure set
 - [ ] R5: full benchmark + ablations
 - [ ] R6: paper on arXiv + submission
 
