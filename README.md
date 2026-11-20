@@ -859,8 +859,12 @@ The project counts as complete when:
 - [x] R2: ≥ 100 labelled chunks (105 chunks, 7 scenes; oracle 1.18 dB vs best fixed 2.53 dB; pose metrics |ρ| ≤ 0.18 with twin loss)
 - [x] R3: signals + predictor (H1/H2). Geometric router 66% of the oracle gap (≈ a one-threshold rule, 63%); R3b 1,000-step 3DGS probe 83%, significantly better (−0.26 dB, CI [−0.44, −0.10]) and better at ranking than ground-truth pose error (80% vs ≤ 75%)
 - [ ] R4: conformal router + failure set (H3/H4). Conformal cascade done: α = 0.1 holds on held-out scenes (risk 0.095), 1.46 dB at 192 s vs 1.42 dB at 264 s for probing everything; per-scene coverage fails on 2–4/7 scenes; escalation score near random at small budgets. R4b: predicting the escalation gain fails (ρ ≈ 0); the gain from VGGT+BA isn't visible before running it. Open: the own failure set
-- [ ] R5: full benchmark + ablations
-- [ ] R6: paper on arXiv + submission
+- [ ] R5: full benchmark (fixed scope, nothing added after Nov 20, 2026):
+  - [ ] R5.1 independent scoring: test cameras aligned to the reference + test-time pose refinement; do R2–R4's conclusions hold?
+  - [ ] R5.2 own failure set: 4 phone captures (low texture, wide baseline, moving objects, low light), pseudo-ground truth from COLMAP on all frames
+  - [ ] R5.3 second dataset: Tanks & Temples + Deep Blending (truck, train, playroom, drjohnson)
+  - [ ] R5.4 final analysis on all data: router, conformal guarantee across datasets, figures
+- [ ] R6: paper (LaTeX draft → review → arXiv + submission to the next main venue with an open deadline)
 
 ---
 
