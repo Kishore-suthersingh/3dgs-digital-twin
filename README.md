@@ -601,6 +601,27 @@ What this shows:
 - **The price is time.** Probing all three needs all three reconstructions, VGGT+BA included: 264 s per chunk versus 76 s for always-VGGT. Probing only classical and VGGT (142 s) loses most of the gain (1.58 dB): much of the probe's value is in knowing when VGGT+BA is worth it. R4 turns this into a cost-aware cascade: probe only when the cheap signals are unsure.
 - **Caveat:** the probe and the label are the same kind of measurement (held-out PSNR at the method's own poses), only shorter. That makes the probe a fair, deployable signal, but R5 should also score the final twins with an independent protocol (test poses aligned to the reference).
 
+**R4 results: cost-aware cascade with a conformal guarantee** (local CPU; stage 1 always runs classical + VGGT and the geometric router decides; it escalates to VGGT+BA plus 1,000-step probes only when its predicted loss is high. The escalation threshold comes from conformal risk control, calibrated on the other 6 scenes. Risk = share of chunks where the probe was skipped although the cheap choice was > 0.5 dB worse than the best method. Full report: [r4_results.md](docs/research/results/r4/r4_results.md)):
+
+| Policy (leave-one-scene-out, 105 chunks) | Escalated | Mean loss | Mean time | Realized risk (α) |
+|---|---|---|---|---|
+| always VGGT | – | 2.53 dB | 76 s | – |
+| stage 1 only: geometric router, never escalate | 0% | 1.63 dB | 123 s | 0.28 |
+| cascade, conformal α = 0.2 | 26% | 1.54 dB | 154 s | 0.19 |
+| **cascade, conformal α = 0.1** | **51%** | **1.46 dB** | **192 s** | **0.095** |
+| cascade, conformal α = 0.05 | 75% | 1.45 dB | 226 s | 0.048 |
+| always escalate (probe everything) | 100% | 1.42 dB | 264 s | 0 |
+| same cost, random escalation (≈ 50%) | 50% | 1.56 dB | 195 s | – |
+| hindsight escalation, 20% of chunks (not deployable) | 20% | 1.36 dB | 169 s | – |
+| oracle | – | 1.18 dB | – | – |
+
+![R4 cost-quality curve](docs/research/results/r4/r4_cost_quality.png)
+
+What this shows:
+- **The guarantee holds on average, even across scenes.** For every α tested, the realized risk on held-out scenes is at or under α (0.048 / 0.095 / 0.19 / 0.27 for α = 0.05 / 0.1 / 0.2 / 0.3), and on 1,000 random calibration/test splits the mean risk is under α too. But it holds over the whole set, not per scene: 2–4 of the 7 held-out scenes exceed α. Scene shift breaks per-scene (conditional) coverage, as expected.
+- **The cascade buys most of the probe's gain for half its extra cost.** At α = 0.1 it escalates half the chunks and reaches 1.46 dB at 192 s, against 1.42 dB at 264 s for probing everything. Random escalation at the same cost: 1.56 dB.
+- **But the escalation score is weak at small budgets.** Escalating the top 10–20% by predicted loss is barely better than random, while escalating the *right* 20% (hindsight) would reach 1.36 dB, *better* than probing everything. That's because the probe makes things worse on 16 chunks and better on 29. A better escalation score is the main open problem, and the place where the paper can still gain.
+
 **Compute:** VGGT-1B in fp16 on a free T4; labels ≈ 300 chunks × 3-4 reconstructors × ~3 min gsplat ≈ 60 GPU-hours (Colab + committed Kaggle runs, one GPU pinned: F2.2).
 
 ---
@@ -833,7 +854,7 @@ The project counts as complete when:
 - [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each. Garden is complete; bicycle VGGT+BA ran out of memory, and the table scene hasn't been run yet (results in Phase 4)
 - [x] R2: ≥ 100 labelled chunks (105 chunks, 7 scenes; oracle 1.18 dB vs best fixed 2.53 dB; pose metrics |ρ| ≤ 0.18 with twin loss)
 - [x] R3: signals + predictor (H1/H2). Geometric router 66% of the oracle gap (≈ a one-threshold rule, 63%); R3b 1,000-step 3DGS probe 83%, significantly better (−0.26 dB, CI [−0.44, −0.10]) and better at ranking than ground-truth pose error (80% vs ≤ 75%)
-- [ ] R4: conformal router + failure set (H3/H4)
+- [ ] R4: conformal router + failure set (H3/H4). Conformal cascade done: α = 0.1 holds on held-out scenes (risk 0.095), 1.46 dB at 192 s vs 1.42 dB at 264 s for probing everything; per-scene coverage fails on 2–4/7 scenes; escalation score near random at small budgets. Open: a better escalation score, the own failure set
 - [ ] R5: full benchmark + ablations
 - [ ] R6: paper on arXiv + submission
 

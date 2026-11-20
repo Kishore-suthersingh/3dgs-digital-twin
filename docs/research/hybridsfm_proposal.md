@@ -271,6 +271,25 @@ Every usable candidate on each of the 105 chunks is trained with R2's recipe for
 - **Learned + probe ≤ probe alone** (1.50 vs 1.42 dB): with 105 chunks, the forest doesn't add to a strong single signal. R4 should use the probe as the score and calibrate it, not learn on top of it.
 - **Threat to validity:** probe and label share a measurement (held-out PSNR at the method's poses). The final benchmark (R5) must score the routed twins with an independent protocol: test cameras aligned to the reference, then rendered.
 
+### 8.5 R4: cost-aware cascade with conformal risk control (Nov 2026)
+
+Stage 1 runs classical + VGGT; the geometric router (R3) picks a method and predicts its loss. Escalation adds VGGT+BA and 1,000-step probes of every usable candidate (R3b). Conformal risk control picks the escalation threshold λ so that E[L] ≤ α for L = 1[probe skipped and stage-1 regret > 0.5 dB] (a loss monotone in λ, as CRC needs). Scores are nested out-of-scene; λ is calibrated on the other 6 scenes. Code: [`r4_cascade.py`](../../hybrid_sfm/r4_cascade.py); report: [r4_results.md](results/r4/r4_results.md).
+
+| Policy | Escalated | Mean loss | Mean time | Realized risk |
+|---|---|---|---|---|
+| stage 1 only | 0% | 1.63 dB | 123 s | 0.28 |
+| CRC α = 0.2 | 26% | 1.54 dB | 154 s | 0.19 |
+| CRC α = 0.1 | 51% | 1.46 dB | 192 s | 0.095 |
+| CRC α = 0.05 | 75% | 1.45 dB | 226 s | 0.048 |
+| always escalate | 100% | 1.42 dB | 264 s | 0 |
+| random escalation at ≈ 50% | 50% | 1.56 dB | 195 s | – |
+| hindsight escalation at 20% | 20% | 1.36 dB | 169 s | – |
+
+**What it means for the paper:**
+- **H4, partly:** marginal risk control survives leave-one-scene-out shift (realized ≤ α at every α), and the exchangeable check matches the theory (mean risk under α over 1,000 splits). Conditional coverage doesn't: 2–4/7 scenes exceed α. The paper should claim marginal control only and report per-scene coverage, or move to a scene-conditional / weighted conformal method for the shifted case.
+- **H3, partly:** the cascade gets 1.46 dB at 73% of the full-probe cost. That's a real trade-off curve, but the escalation score is the bottleneck: at 10–20% escalation, predicted loss and decision margin are no better than random, while hindsight escalation of 20% would reach 1.36 dB, beating "probe everything". **Next (R4b):** an escalation score aimed at the probe's own gain (does probing help here?), for example from a cheap 250-step probe of the classical + VGGT pair (~7 s), trained to predict the escalation gain rather than the loss.
+- **The failure set is still to build** (phone captures: low texture, wide baselines, motion). Without it, H4's out-of-distribution claim rests on 7 Mip-NeRF 360 scenes only.
+
 ## 9. Risks and mitigations
 
 | Risk | Mitigation |
