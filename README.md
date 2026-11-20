@@ -578,6 +578,29 @@ What this shows:
 - **H1 needs refining.** Pose error vs ground truth ranks two methods *on the same chunk* correctly 72–75% of the time (pairs ≥ 0.3 dB apart), and routing on it reaches 1.55–1.61 dB. Pose metrics are poor at predicting *how good* a twin will be across chunks (R2, |ρ| ≤ 0.18), but decent at ranking methods within one. Even ground-truth pose error leaves 0.4 dB to the oracle, which is the room for rendering-aware signals (H2).
 - **Cost:** the router runs both probes, so its pose time (122 s) is above always-VGGT (76 s). A cost-aware version and the 3DGS-probe signal are next.
 
+**R3b results: short 3DGS probes** (Kaggle T4, ~3.5 h; every usable candidate trained for 1,000 steps with R2's recipe, held-out PSNR at its own poses recorded at 250/500/1,000 steps, so no ground truth is used; full report: [r3b_results.md](docs/research/results/r3b/r3b_results.md), probes: [r3b_probes.jsonl](docs/research/results/r3b/r3b_probes.jsonl)):
+
+| Router (leave-one-scene-out, 105 chunks) | Mean loss | Within 0.5 dB of oracle | Gap closed | vs always VGGT (95% CI) | Decision time |
+|---|---|---|---|---|---|
+| always VGGT (best fixed) | 2.53 | 31% | 0% | – | 76 s |
+| one threshold: classical registered fraction (R3) | 1.68 | 70% | 63% | −0.86 [−1.17, −0.56] | 110 s |
+| learned: geometric features (R3) | 1.65 | 71% | 66% | −0.89 [−1.16, −0.64] | 122 s |
+| probe@250: best probe PSNR | 1.59 | 70% | 70% | −0.94 [−1.23, −0.68] | 229 s |
+| probe@500: best probe PSNR | 1.47 | 80% | 79% | −1.06 [−1.34, −0.81] | 243 s |
+| **probe@1000: best probe PSNR** | **1.42** | **83%** | **83%** | **−1.12 [−1.40, −0.85]** | 264 s |
+| probe@1000, classical + VGGT only (no BA run) | 1.58 | 75% | 70% | −0.95 [−1.23, −0.70] | 142 s |
+| learned: geometric features + probe@1000 | 1.50 | 80% | 77% | −1.04 [−1.33, −0.74] | 264 s |
+| best pose error vs ground truth (median rotation; not deployable) | 1.55 | 74% | 73% | −0.99 [−1.25, −0.74] | 220 s |
+| oracle | 1.18 | 100% | 100% | −1.35 | 71 s |
+
+What this shows:
+- **Rendering-aware routing works (H2).** Training each candidate for 1,000 steps (~18 s of GPU each) and keeping the best closes **83%** of the gap, against 63% for the one-threshold rule. The difference is significant: −0.26 dB, 95% CI [−0.44, −0.10]. It beats that rule on 6 of 7 held-out scenes (garden: 1.31 vs 1.25 dB).
+- **A short probe ranks better than the true pose error.** For two methods on the same chunk (≥ 0.3 dB apart), the 1,000-step probe orders them correctly 80% of the time, versus 69–75% for every ground-truth pose metric. Its router (1.42 dB) also edges out routing on ground-truth rotation error (1.55 dB; difference −0.13, CI [−0.30, +0.03]).
+- **Probe length matters:** 250 steps is barely better than the geometric router (rank agreement with the 3k-step result ρ = 0.72); 500 steps reaches 79% of the gap (ρ = 0.88); 1,000 steps 83% (ρ = 0.94).
+- **Learning on top doesn't help yet:** adding the probe to the 32 geometric features (1.50 dB) is no better than the raw probe (1.42 dB).
+- **The price is time.** Probing all three needs all three reconstructions, VGGT+BA included: 264 s per chunk versus 76 s for always-VGGT. Probing only classical and VGGT (142 s) loses most of the gain (1.58 dB): much of the probe's value is in knowing when VGGT+BA is worth it. R4 turns this into a cost-aware cascade: probe only when the cheap signals are unsure.
+- **Caveat:** the probe and the label are the same kind of measurement (held-out PSNR at the method's own poses), only shorter. That makes the probe a fair, deployable signal, but R5 should also score the final twins with an independent protocol (test poses aligned to the reference).
+
 **Compute:** VGGT-1B in fp16 on a free T4; labels ≈ 300 chunks × 3-4 reconstructors × ~3 min gsplat ≈ 60 GPU-hours (Colab + committed Kaggle runs, one GPU pinned: F2.2).
 
 ---
@@ -809,7 +832,7 @@ The project counts as complete when:
 - [x] R0: proposal + literature check ([`docs/research/`](docs/research/hybridsfm_proposal.md))
 - [ ] R1: VGGT / VGGT+BA vs COLMAP, with 3DGS PSNR on each. Garden is complete; bicycle VGGT+BA ran out of memory, and the table scene hasn't been run yet (results in Phase 4)
 - [x] R2: ≥ 100 labelled chunks (105 chunks, 7 scenes; oracle 1.18 dB vs best fixed 2.53 dB; pose metrics |ρ| ≤ 0.18 with twin loss)
-- [ ] R3: signals + predictor (H1/H2). First predictor done: 66% of the oracle gap closed, leave-one-scene-out; nearly matched by a one-threshold rule on classical registration. Next: R3b short 3DGS probes ([`06_r3b_probes.ipynb`](notebooks/06_r3b_probes.ipynb): 250/500/1,000-step held-out PSNR per candidate; notebook ready, tested locally, not yet run), then cost-aware routing
+- [x] R3: signals + predictor (H1/H2). Geometric router 66% of the oracle gap (≈ a one-threshold rule, 63%); R3b 1,000-step 3DGS probe 83%, significantly better (−0.26 dB, CI [−0.44, −0.10]) and better at ranking than ground-truth pose error (80% vs ≤ 75%)
 - [ ] R4: conformal router + failure set (H3/H4)
 - [ ] R5: full benchmark + ablations
 - [ ] R6: paper on arXiv + submission

@@ -247,6 +247,30 @@ flowchart LR
 - **H2, not yet tested properly.** The only rendering-adjacent signal so far, multi-view depth consistency, adds little on top of classical statistics (ablation −0.02 dB), and VGGT's native confidence is worse than useless as a router. The next signals are the ones the proposal centres on: photometric warp consistency on the real images, and a short 3DGS probe (~500 steps) per candidate. They need a GPU run over the R2 chunks.
 - **Small data:** 105 chunks from 7 scenes. Per-scene variance is large (the router beats both fixed policies on 4 of 7 held-out scenes; on kitchen always-classical is 0.47 dB better). More scenes (Tanks & Temples, the own failure set) are needed before the conformal step (R4) can give a meaningful guarantee.
 
+### 8.4 R3b: short 3DGS probes (Kaggle T4, Nov 2026)
+
+Every usable candidate on each of the 105 chunks is trained with R2's recipe for 1,000 steps ([notebook](../../notebooks/06_r3b_probes.ipynb)). Held-out PSNR at the method's own poses is recorded at 250/500/1,000 steps; no ground truth is used. Mean probe training time: 3.7 / 9.0 / 17.4 s. Full report: [r3b_results.md](results/r3b/r3b_results.md).
+
+| Router (leave-one-scene-out, 105 chunks) | Mean loss | Within 0.5 dB of oracle | Gap closed | vs always VGGT (95% CI) | Decision time |
+|---|---|---|---|---|---|
+| always VGGT (best fixed) | 2.53 | 31% | 0% | – | 76 s |
+| one threshold: classical registered fraction (R3) | 1.68 | 70% | 63% | −0.86 [−1.17, −0.56] | 110 s |
+| learned: geometric features (R3) | 1.65 | 71% | 66% | −0.89 [−1.16, −0.64] | 122 s |
+| probe@250: best probe PSNR | 1.59 | 70% | 70% | −0.94 [−1.23, −0.68] | 229 s |
+| probe@500: best probe PSNR | 1.47 | 80% | 79% | −1.06 [−1.34, −0.81] | 243 s |
+| **probe@1000: best probe PSNR** | **1.42** | **83%** | **83%** | **−1.12 [−1.40, −0.85]** | 264 s |
+| probe@1000, classical + VGGT only (no BA run) | 1.58 | 75% | 70% | −0.95 [−1.23, −0.70] | 142 s |
+| learned: geometric features + probe@1000 | 1.50 | 80% | 77% | −1.04 [−1.33, −0.74] | 264 s |
+| best pose error vs ground truth (median rotation; not deployable) | 1.55 | 74% | 73% | −0.99 [−1.25, −0.74] | 220 s |
+| oracle | 1.18 | 100% | 100% | −1.35 | 71 s |
+
+**What it means for the paper:**
+- **H2 supported:** a rendering-aware signal, a 1,000-step 3DGS probe, closes 83% of the oracle gap versus 63–66% for the best geometric routers. The gain is significant: −0.26 dB vs the one-threshold rule, paired-bootstrap CI [−0.44, −0.10], better on 6/7 held-out scenes.
+- **H1, final form:** within a chunk, the probe ranks methods correctly 80% of the time, better than any ground-truth pose metric (69–75%). Routing on it (1.42 dB) matches or beats routing on ground-truth rotation error (1.55 dB). So for a 3DGS twin, what you can measure by rendering is a better routing signal than what you could measure with ground-truth poses.
+- **The paper's real contribution becomes cost:** the probe needs every candidate reconstructed (264 s vs 76 s for always-VGGT). Probing only the cheap pair keeps 70% of the gap at 142 s. **R4:** a cost-aware cascade (geometric features decide when confident; probe otherwise) with conformal risk control on the decision, and the risk–cost curve as the main figure.
+- **Learned + probe ≤ probe alone** (1.50 vs 1.42 dB): with 105 chunks, the forest doesn't add to a strong single signal. R4 should use the probe as the score and calibrate it, not learn on top of it.
+- **Threat to validity:** probe and label share a measurement (held-out PSNR at the method's poses). The final benchmark (R5) must score the routed twins with an independent protocol: test cameras aligned to the reference, then rendered.
+
 ## 9. Risks and mitigations
 
 | Risk | Mitigation |
