@@ -305,6 +305,16 @@ Stage 1.5 adds an early probe of the cheap pair (250 or 500 steps, ~4–9 s each
 
 **Reading:** the gain is real (helps on 29 chunks, median +0.8 dB, 12 over 1 dB; hurts on 16, median −0.6 dB) but unpredictable from pre-BA signals (Spearman ρ = 0.02 / −0.05). Conformal control remains valid. For the paper this is a useful negative: **the value of VGGT+BA for the twin can't be forecast from VGGT's output, the classical reconstruction, or an early probe of either.** It has to be measured. The cost lever therefore moves into BA itself (a cheaper BA variant, or an early-exit test after a few BA iterations), which is future work rather than more routing features.
 
+### 8.7 R5.1: independent scoring (Kaggle T4, Nov 2026)
+
+R2's label scores the twin at the method's own held-out poses, as the probe does. R5.1 re-scores all 105 chunks without the method's test poses. The reference cameras are Sim(3)-aligned to the twin's training cameras, then refined at test time for 200 steps with the Gaussians frozen. Then R3/R3b/R4 are rerun unchanged. Report: [r5_results.md](results/r5/r5_results.md).
+
+- **The labels mostly agree:** Spearman ρ = 0.79, median |Δ| = 0.21 dB, same best method on 91/105 chunks. The exceptions are informative. Classical on room/kitchen has wrongly registered cameras that look fine at its own poses (3–5 dB → 10–18 dB).
+- **The probe claim holds and strengthens.** probe@1000 closes 77% of the gap (regret 0.28 dB). That is −1.28 dB [−1.92, −0.74] vs the best one-threshold rule and −0.43 [−0.71, −0.18] vs the learned feature router. It ranks methods correctly on 83% of pairs vs 70–74% for ground-truth pose error.
+- **Cheap geometric routers weaken:** the stump goes from 63% to −30% of the gap, the learned router from 66% to 41%. They trusted classical registrations that only the rendered twin exposes as wrong.
+- **CRC:** realized risk 0.057 / 0.114 at α = 0.05 / 0.1, a slight overshoot across non-exchangeable scenes. It is exact at 0.2 and 0.3.
+- **Decision:** the independent label is the paper's primary label; own-pose results become a robustness appendix.
+
 ## 9. Risks and mitigations
 
 | Risk | Mitigation |
